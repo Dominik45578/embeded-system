@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: backend
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${BACKEND_ISSUER_URI}
+          jwk-set-uri: ${BACKEND_JWK_SET_URI}
