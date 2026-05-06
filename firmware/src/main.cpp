@@ -2,11 +2,11 @@
 #include "PinManager.hpp"
 #include <Arduino.h>
 #include "LedcSerwoManager.hpp"
-
-
+#include <PubSubClient.h>
+#include "MqttManager.hpp"
 
 LedcSerwoManager servo;
-
+MqttManager* mqtt_manager;
 PinKeypadController * pin_controller = new PinKeypadController(keypad);
 
 void resetLeds(){
@@ -42,6 +42,9 @@ void setup(){
   servo.setRes(SERVO_RES);
   servo.setBounds(500, 1500, 2500);
   servo.begin(SERVO_PIN);
+
+  mqtt_manager = new MqttManager();
+  mqtt_manager->setupWiFi();
 }
 
 PinState last_state = PinState::IDLE;
@@ -55,6 +58,7 @@ void handleFlags(const PinState state){
         digitalWrite(GREEN_LED, HIGH);
         attachServo();
         openLock();
+        mqtt_manager->publish("topicCinkus", "BLOCKED");
         break;
 
     case PinState::ERROR:
@@ -82,6 +86,8 @@ void handleFlags(const PinState state){
 }
 
 void loop(){
+  mqtt_manager->loop();
+  
   pin_controller->update();
   new_state = pin_controller->getState();
   if(last_state!=new_state){
