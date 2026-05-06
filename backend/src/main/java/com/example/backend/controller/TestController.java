@@ -4,11 +4,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-public class TestController {
+class TestController {
 
     @GetMapping
     public String test() {
-        return "test";
+        return "test"; // This is here only to test FireBase auth
     }
 
 }

@@ -7,3 +7,8 @@ spring:
         jwt:
           issuer-uri: ${BACKEND_ISSUER_URI}
           jwk-set-uri: ${BACKEND_JWK_SET_URI}
+
+backend:
+  mqtt:
+    host: ${BACKEND_MQTT_HOST}
+    topic: ${BACKEND_MQTT_TOPIC
