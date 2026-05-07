@@ -11,4 +11,8 @@ spring:
 backend:
   mqtt:
     host: ${BACKEND_MQTT_HOST}
-    topic: ${BACKEND_MQTT_TOPIC
+    topic: ${BACKEND_MQTT_TOPIC}
+  influx:
+    host: ${BACKEND_INFLUX_HOST}
+    token: ${BACKEND_INFLUX_TOKEN}
+    database: ${BACKEND_INFLUX_DATABASE}

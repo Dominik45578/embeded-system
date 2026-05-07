@@ -70,8 +70,8 @@
 		</dependency>
 		<dependency>
 			<groupId>com.influxdb</groupId>
-			<artifactId>influxdb-client-java</artifactId>
-			<version>3.3.0</version>
+			<artifactId>influxdb3-java</artifactId>
+			<version>1.9.0</version>
 		</dependency>
 	</dependencies>
 

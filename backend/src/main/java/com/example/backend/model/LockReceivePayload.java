@@ -1,4 +1,6 @@
 package com.example.backend.model;
 
-public record LockReceivePayload(String deviceId, LockState lockState) {
+import java.time.Instant;
+
+public record LockReceivePayload(String deviceId, LockState lockState, Instant timestamp) {
 }
