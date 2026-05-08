@@ -15,4 +15,5 @@ backend:
   influx:
     host: ${BACKEND_INFLUX_HOST}
     token: ${BACKEND_INFLUX_TOKEN}
-    database: ${BACKEND_INFLUX_DATABASE}
+    bucket: ${BACKEND_INFLUX_BUCKET}
+    org: ${BACKEND_INFLUX_ORG}
