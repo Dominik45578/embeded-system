@@ -25,8 +25,7 @@ class BleManager;
 class CharacteristicCallbackHandler : public NimBLECharacteristicCallbacks {
 public:
     using WriteCallback = std::function<void(const std::string&)>;
-
-    void onWrite(NimBLECharacteristic* pChar) {
+    void onWrite(NimBLECharacteristic* pChar, NimBLEConnInfo& connInfo) override {
         if (writeCb_) {
             auto val = pChar->getValue();
             std::string strValue(val.begin(), val.end());
@@ -44,15 +43,12 @@ class CharacteristicBuilder {
 public:
     CharacteristicBuilder(const std::string& uuid, NimBLEService* pService, NimBleCoreAdapter* adapter, ServiceBuilder* parent);
 
-    // Uprawnienia (Fluent API)
     CharacteristicBuilder& readAccess();
     CharacteristicBuilder& writeAccess();
     CharacteristicBuilder& notifyAccess();
     
-    // Obsługa zdarzeń z telefonu
     CharacteristicBuilder& onWrite(std::function<void(const std::string&)> callback);
 
-    // Kończy budowę charakterystyki i wraca do budowy Serwisu
     ServiceBuilder& buildCharacteristic();
 
 private:
@@ -64,14 +60,12 @@ private:
     CharacteristicCallbackHandler* callbackHandler_ = nullptr;
 };
 
-// --- Budowniczy Serwisu (ServiceBuilder) ---
 class ServiceBuilder {
 public:
     ServiceBuilder(const std::string& uuid, NimBleCoreAdapter* adapter, BleManager* manager);
 
     CharacteristicBuilder addCharacteristic(const std::string& uuid);
     
-    // Kończy budowę serwisu i go uruchamia, wraca do Menedżera
     BleManager& buildService();
 
 private:
@@ -81,7 +75,6 @@ private:
     BleManager* manager_;
 };
 
-// --- Główny Menedżer (BleManager) ---
 class BleManager {
 public:
     static BleManager& getInstance() {
@@ -94,10 +87,8 @@ public:
 
     void init(const std::string& deviceName);
 
-    // Uruchamia łańcuch budowania serwisu
     ServiceBuilder createNewService(const std::string& uuid);
 
-    // Ustawienia profilów
     void setPerformanceProfile(BlePerformanceProfile profile);
     void manageAdvertising(BleAdvertisingMode mode);
 
