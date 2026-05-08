@@ -58,13 +58,13 @@ void handleFlags(const PinState state){
         digitalWrite(GREEN_LED, HIGH);
         attachServo();
         openLock();
-        mqtt_manager->publish("topicCinkus", "BLOCKED");
         break;
 
     case PinState::ERROR:
          Serial.println("Błędny pin");
          digitalWrite(RED_LED,HIGH);
          detachServo();
+         mqtt_manager->publish("topicCinkus", "BLOCKED");
         break;
 
     case PinState::SETTING_MODE:

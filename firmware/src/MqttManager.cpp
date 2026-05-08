@@ -16,9 +16,15 @@ void MqttManager::setupWiFi() {
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
 
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
+    int i = 0;
+    while ( WiFi.status() != WL_CONNECTED) {
+        delay(100);
         Serial.print(".");
+        if(i = 10){
+            Serial.println("Wifi setup error");
+            return;
+        }
+        i++;
     }
 
     Serial.println();
@@ -58,6 +64,7 @@ void MqttManager::loop() {
 
 void MqttManager::publish(const String& topic, const char* message) {
     if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("Cannot publish due to Wifi error");
         return;
     }
 

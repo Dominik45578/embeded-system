@@ -1,0 +1,132 @@
+#include "BleManager.hpp"
+#include <Arduino.h>
+
+// ==========================================
+// CHARACTERISTIC BUILDER
+// ==========================================
+
+CharacteristicBuilder::CharacteristicBuilder(const std::string& uuid, NimBLEService* pService, NimBleCoreAdapter* adapter, ServiceBuilder* parent)
+    : uuid_(uuid), pService_(pService), adapter_(adapter), parent_(parent) {}
+
+CharacteristicBuilder& CharacteristicBuilder::readAccess() {
+    using CP = BleDomain::CharacteristicProperty;
+    properties_ |= static_cast<uint32_t>(CP::READ);
+    return *this;
+}
+
+CharacteristicBuilder& CharacteristicBuilder::writeAccess() {
+    using CP = BleDomain::CharacteristicProperty;
+    properties_ |= static_cast<uint32_t>(CP::WRITE);
+    return *this;
+}
+
+CharacteristicBuilder& CharacteristicBuilder::notifyAccess() {
+    using CP = BleDomain::CharacteristicProperty;
+    properties_ |= static_cast<uint32_t>(CP::NOTIFY);
+    return *this;
+}
+
+CharacteristicBuilder& CharacteristicBuilder::onWrite(std::function<void(const std::string&)> callback) {
+    if (!callbackHandler_) {
+        // Alokujemy nowy handler. Będzie on przypisany do charakterystyki na cały czas życia aplikacji
+        callbackHandler_ = new CharacteristicCallbackHandler();
+    }
+    callbackHandler_->setWriteCallback(callback);
+    return *this;
+}
+
+ServiceBuilder& CharacteristicBuilder::buildCharacteristic() {
+    // 1. Tworzymy charakterystykę w adapterze z zebranymi prawami dostępu
+    NimBLECharacteristic* pChar = adapter_->createCharacteristic(pService_, uuid_, properties_);
+    
+    // 2. Jeśli dodano jakieś zdarzenia (np. onWrite), przypisujemy handler
+    if (callbackHandler_ && pChar) {
+        adapter_->setCharacteristicCallbacks(pChar, callbackHandler_);
+    }
+    
+    return *parent_;
+}
+
+// ==========================================
+// SERVICE BUILDER
+// ==========================================
+
+ServiceBuilder::ServiceBuilder(const std::string& uuid, NimBleCoreAdapter* adapter, BleManager* manager)
+    : uuid_(uuid), adapter_(adapter), manager_(manager) {
+    // Od razu zlecamy adapterowi rezerwację miejsca na serwis
+    pService_ = adapter_->createService(uuid_);
+}
+
+CharacteristicBuilder ServiceBuilder::addCharacteristic(const std::string& uuid) {
+    return CharacteristicBuilder(uuid, pService_, adapter_, this);
+}
+
+BleManager& ServiceBuilder::buildService() {
+    // Uruchamiamy serwis, aby był widoczny
+    adapter_->startService(pService_);
+    return *manager_;
+}
+
+// ==========================================
+// BLE MANAGER
+// ==========================================
+
+BleManager::BleManager(NimBleCoreAdapter* adapter) : adapter_(adapter) {}
+
+void BleManager::init(const std::string& deviceName) {
+    adapter_->powerOn(deviceName);
+    // Ustawiamy parowanie z domyślnymi parametrami na start
+    adapter_->setPairingMode(BleDomain::FeatureState::ENABLE);
+}
+
+ServiceBuilder BleManager::createNewService(const std::string& uuid) {
+    return ServiceBuilder(uuid, adapter_, this);
+}
+
+void BleManager::setPerformanceProfile(BlePerformanceProfile profile) {
+    switch(profile) {
+        case BlePerformanceProfile::OTA_UPDATE:
+            // Maksymalna wydajność: indeks 7 w kPowerLevelToDbm w adapterze (9 dBm)
+            adapter_->setTxPower(static_cast<BleDomain::BlePowerLevel>(7)); 
+            adapter_->optimizeForDataTransfer(512); // Maksymalne MTU
+            Serial.println("[BLE] Profil: OTA UPDATE (Max Performance)");
+            break;
+            
+        case BlePerformanceProfile::ECO:
+            // Minimalna moc: indeks 0 w kPowerLevelToDbm w adapterze (-12 dBm)
+            adapter_->setTxPower(static_cast<BleDomain::BlePowerLevel>(0));
+            // standardowe MTU
+            adapter_->optimizeForDataTransfer(23);
+            Serial.println("[BLE] Profil: ECO (Low Power)");
+            break;
+
+        case BlePerformanceProfile::STANDARD:
+            // Zbalansowana moc: indeks 4 (0 dBm)
+            adapter_->setTxPower(static_cast<BleDomain::BlePowerLevel>(4));
+            adapter_->optimizeForDataTransfer(256);
+            Serial.println("[BLE] Profil: STANDARD");
+            break;
+    }
+}
+
+void BleManager::manageAdvertising(BleAdvertisingMode mode) {
+    switch(mode) {
+        case BleAdvertisingMode::FAST:
+            // Ustawienia w tickach 0.625ms (0x20 = 20ms, 0x40 = 40ms)
+            adapter_->setAdvertisingIntervals(0x20, 0x40);
+            adapter_->startAdvertising(0);
+            break;
+        case BleAdvertisingMode::SLOW:
+            // Interwały rzędu setek milisekund
+            adapter_->setAdvertisingIntervals(0x100, 0x200);
+            adapter_->startAdvertising(0);
+            break;
+        case BleAdvertisingMode::STOPPED:
+            adapter_->suspendAdvertising();
+            break;
+    }
+}
+
+int BleManager::getActiveConnectionsCount() const {
+    return adapter_->getConnectedCount();
+}
