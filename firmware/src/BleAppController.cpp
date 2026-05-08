@@ -1,17 +1,21 @@
 #include "BleAppController.hpp"
 
-BleAppController::BleAppController(BleManager* manager) : manager_(manager), currentState(BleAppState::OFF) {}
+BleAppController::BleAppController() : currentState(BleAppState::OFF) {}
 
 void BleAppController::init() {
+    Serial.println("[BleAppController] Inicjalizacja bluetooth....");
+    BleManager::getInstance().init("Lockly-Zamek");
+
+
     Serial.println("[BleAppController] Inicjalizacja kontrolera...");
-    manager_->createNewService("FF10")
+    BleManager::getInstance().createNewService("FF10")
         .addCharacteristic("FF11")
             .readAccess()
             .notifyAccess()
             .buildCharacteristic()
         .buildService();
 
-    int pairedCount = 0;
+    int pairedCount = BleManager::getInstance().getPairedCount(); 
 
     if (pairedCount > 0) {
         changeState(BleAppState::IDLE_SCAN);
@@ -36,7 +40,7 @@ void BleAppController::loop() {
             break;
     }
 
-    if (currentState != BleAppState::CONNECTED && manager_->getActiveConnectionsCount() > 0) {
+    if (currentState != BleAppState::CONNECTED && BleManager::getInstance().getActiveConnectionsCount() > 0) {
         changeState(BleAppState::CONNECTED);
     }
 }
@@ -62,8 +66,8 @@ void BleAppController::changeState(BleAppState newState) {
 void BleAppController::handleStateOff() {
     static bool isStopped = false;
     if (!isStopped) {
-        manager_->manageAdvertising(BleAdvertisingMode::STOPPED);
-        manager_->setPerformanceProfile(BlePerformanceProfile::ECO);
+        BleManager::getInstance().manageAdvertising(BleAdvertisingMode::STOPPED);
+        BleManager::getInstance().setPerformanceProfile(BlePerformanceProfile::ECO);
         isStopped = true;
     }
 }
@@ -71,15 +75,20 @@ void BleAppController::handleStateOff() {
 void BleAppController::handleStatePairing() {
     static bool isBroadcastingFast = false;
     if (!isBroadcastingFast) {
-        manager_->setPerformanceProfile(BlePerformanceProfile::STANDARD);
-        manager_->manageAdvertising(BleAdvertisingMode::FAST);
+        BleManager::getInstance().setPerformanceProfile(BlePerformanceProfile::STANDARD);
+        BleManager::getInstance().manageAdvertising(BleAdvertisingMode::FAST);
         isBroadcastingFast = true;
     }
 
     if (millis() - stateEnterMillis > PAIRING_TIMEOUT) {
         Serial.println("[BleAppController] Timeout parowania. Wracam do usypiania.");
-        isBroadcastingFast = false; // Reset flagi
-        changeState(BleAppState::OFF); // lub IDLE_SCAN, zależnie czy mamy już sparowane
+        isBroadcastingFast = false; 
+        
+        if (BleManager::getInstance().getPairedCount() > 0) {
+            changeState(BleAppState::IDLE_SCAN);
+        } else {
+            changeState(BleAppState::OFF);
+        }
     }
 }
 
@@ -87,23 +96,23 @@ void BleAppController::handleStateIdle() {
     if (!isRadioTemporarilyAwake) {
         if (millis() - lastPeriodicWakeupMillis > IDLE_WAKEUP_INTERVAL) {
             Serial.println("[BleAppController] Cykliczne wybudzenie radia na 15 sekund...");
-            manager_->setPerformanceProfile(BlePerformanceProfile::ECO);
-            manager_->manageAdvertising(BleAdvertisingMode::SLOW);       
+            BleManager::getInstance().setPerformanceProfile(BlePerformanceProfile::ECO);
+            BleManager::getInstance().manageAdvertising(BleAdvertisingMode::SLOW);
             isRadioTemporarilyAwake = true;
-            stateEnterMillis = millis(); // Re-używamy timera
+            stateEnterMillis = millis(); 
         }
     } else {
         if (millis() - stateEnterMillis > IDLE_ACTIVE_TIME) {
             Serial.println("[BleAppController] Koniec okna nasłuchu. Usypiam radio.");
-            manager_->manageAdvertising(BleAdvertisingMode::STOPPED);
+            BleManager::getInstance().manageAdvertising(BleAdvertisingMode::STOPPED);
             isRadioTemporarilyAwake = false;
-            lastPeriodicWakeupMillis = millis(); // Zapisujemy czas zakończenia
+            lastPeriodicWakeupMillis = millis(); 
         }
     }
 }
 
 void BleAppController::handleStateConnected() {
-    if (manager_->getActiveConnectionsCount() == 0) {
+    if (BleManager::getInstance().getActiveConnectionsCount() == 0) {
         Serial.println("[BleAppController] Rozłączono. Przechodzę w tryb IDLE.");
         changeState(BleAppState::IDLE_SCAN);
         return;
@@ -117,14 +126,13 @@ void BleAppController::handleStateConnected() {
     }
 }
 
-
 void BleAppController::checkConnectionQualityAndAdjustPower() {
-    int currentRssi = -75;
+    int currentRssi = BleManager::getInstance().getAverageRssi();
 
     static BlePerformanceProfile lastProfile = BlePerformanceProfile::STANDARD;
     BlePerformanceProfile newProfile = lastProfile;
 
-    if (currentRssi < -85) {
+    if (currentRssi < -85 && currentRssi != -100) {
         newProfile = BlePerformanceProfile::OTA_UPDATE; 
     } else if (currentRssi > -60) {
         newProfile = BlePerformanceProfile::ECO;
@@ -133,12 +141,27 @@ void BleAppController::checkConnectionQualityAndAdjustPower() {
     }
 
     if (newProfile != lastProfile) {
-        Serial.println("[BleAppController] Zmiana jakości sygnału! Aktualizuję moc anteny.");
-        manager_->setPerformanceProfile(newProfile);
+        Serial.print("[BleAppController] Jakość sygnału: ");
+        Serial.print(currentRssi);
+        Serial.println(" dBm. Aktualizuję moc anteny.");
+        
+        BleManager::getInstance().setPerformanceProfile(newProfile);
         lastProfile = newProfile;
     }
 }
 
 void BleAppController::sendDeveloperStats() {
-    String stats = "{\"uptime\":" + String(millis() / 1000) + ",\"rssi\":-75}";
+    int currentRssi = BleManager::getInstance().getAverageRssi();
+    int paired = BleManager::getInstance().getPairedCount();
+    unsigned long uptimeSeconds = millis() / 1000;
+    
+    String statsPayload = "{\"uptime\":" + String(uptimeSeconds) + 
+                          ",\"rssi\":" + String(currentRssi) + 
+                          ",\"paired\":" + String(paired) + "}";
+    
+    bool success = BleManager::getInstance().updateAndNotify("FF10", "FF11", statsPayload.c_str());
+    
+    if(!success) {
+        Serial.println("[BleAppController] Błąd wysyłania statystyk! Sprawdź UUID.");
+    }
 }

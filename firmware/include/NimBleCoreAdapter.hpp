@@ -42,13 +42,19 @@ class NimBleCoreAdapter {
     uint32_t translateDescProperties  (uint32_t domainProps)  const;
     void applySecurityState();
     BleDomain::ConnectionInfo buildConnectionInfo(const NimBLEConnInfo& raw) const;
+    NimBleCoreAdapter();
 
 public:
-    NimBleCoreAdapter();
-    ~NimBleCoreAdapter();
+    static NimBleCoreAdapter& getInstance() {
+        static NimBleCoreAdapter instance;
+        return instance;
+    }
 
-    NimBleCoreAdapter(const NimBleCoreAdapter&)            = delete;
+
+    NimBleCoreAdapter(const NimBleCoreAdapter&) = delete;
     NimBleCoreAdapter& operator=(const NimBleCoreAdapter&) = delete;
+
+    ~NimBleCoreAdapter();
 
     void powerOn(const std::string& name);
     void powerOff();
@@ -142,6 +148,7 @@ public:
     void setOnDisconnectCallback (BleDomain::DisconnectCallback cb);
     void setOnAuthCompleteCallback(BleDomain::AuthCallback      cb);
     void setOnMtuChangedCallback (BleDomain::MtuChangedCallback cb);
+    int getPeerRssi(uint16_t connHandle) const;
 
     [[nodiscard]] NimBLEServer* getRawServer()      const;
     [[nodiscard]] NimBLEAdvertising* getRawAdvertising() const;

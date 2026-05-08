@@ -1,105 +1,130 @@
-#include "setup.hpp"
-#include "PinManager.hpp"
 #include <Arduino.h>
+#include "setup.hpp"
 #include "LedcSerwoManager.hpp"
-#include <PubSubClient.h>
+#include "KeypadLockController.hpp"
+#include "BleAppController.hpp"
+#include "BleLockController.hpp"
 #include "MqttManager.hpp"
+#include "LockController.hpp"
 
 LedcSerwoManager servo;
 MqttManager* mqtt_manager;
-PinKeypadController * pin_controller = new PinKeypadController(keypad);
+KeypadLockController* keypad_controller;
+BleAppController* ble_app_controller;
+BleLockController* ble_lock_controller;
 
-void resetLeds(){
-  digitalWrite(BLUE_LED, LOW);
-  digitalWrite(RED_LED, LOW);
-  digitalWrite(GREEN_LED, LOW);
+LockSystemState lastSystemState = LockSystemState::IDLE_LOCKED;
+
+void resetLeds() {
+    digitalWrite(RED_LED, LOW);
+    digitalWrite(GREEN_LED, LOW);
+    digitalWrite(BLUE_LED, LOW);
 }
 
-void attachServo() {
-  servo.atachLedc();
+String sourceToString(ActionSource source) {
+    switch (source) {
+        case ActionSource::KEYPAD: return "KEYPAD";
+        case ActionSource::BLUETOOTH: return "BLUETOOTH";
+        case ActionSource::WIFI: return "WIFI";
+        case ActionSource::SYSTEM: return "SYSTEM";
+        default: return "NONE";
+    }
 }
 
-void detachServo() {
-  servo.detachLedc();
-}
-
-void openLock() {
-  servo.openLock(100);
-  delay(10000);
-  servo.closeLock(100);
-  delay(1000);
-}
-
-void setup(){
-  Serial.begin(115200);
-  pinMode(RED_LED,OUTPUT);
-  pinMode(GREEN_LED,OUTPUT);
-  pinMode(BLUE_LED,OUTPUT);
-  pinMode(BUTTON, INPUT_PULLUP);
-
-  servo.setChanel(SERVO_CHANNEL);
-  servo.setFrequency(SERVO_FREQ);
-  servo.setRes(SERVO_RES);
-  servo.setBounds(500, 1500, 2500);
-  servo.begin(SERVO_PIN);
-
-  mqtt_manager = new MqttManager();
-  mqtt_manager->setupWiFi();
-}
-
-PinState last_state = PinState::IDLE;
-PinState new_state = PinState::IDLE;
-
-void handleFlags(const PinState state){
+void setup() {
+    Serial.begin(115200);
+    Serial.println("[System] Uruchamianie zamka...");
+    
+    pinMode(RED_LED, OUTPUT);
+    pinMode(GREEN_LED, OUTPUT);
+    pinMode(BLUE_LED, OUTPUT);
+    pinMode(BUTTON, INPUT_PULLUP);
     resetLeds();
-   switch(state) {
-    case PinState::VALID:
-        Serial.println("Pin poprawny");
-        digitalWrite(GREEN_LED, HIGH);
-        attachServo();
-        openLock();
-        break;
 
-    case PinState::ERROR:
-         Serial.println("Błędny pin");
-         digitalWrite(RED_LED,HIGH);
-         detachServo();
-         mqtt_manager->publish("topicCinkus", "BLOCKED");
-        break;
+    servo.setChanel(SERVO_CHANNEL);
+    servo.setFrequency(SERVO_FREQ);
+    servo.setRes(SERVO_RES);
+    servo.setBounds(500, 1500, 2500);
+    servo.begin(SERVO_PIN);
 
-    case PinState::SETTING_MODE:
-        Serial.println("Ustawaim nowy pin..");
-        digitalWrite(BLUE_LED,HIGH);
-        break;
-    case PinState::TIMEOUT:
-      Serial.println("Przekroczono limit czasu");
-      digitalWrite(RED_LED,HIGH);
-      break;
-    case PinState::ENTERING:
-      Serial.println("Wpisywanie pinu...");
-      digitalWrite(BLUE_LED,HIGH);
-      break;
-    case PinState::BLOCKED:
-      Serial.println("Zamek zablokowany jeszcze na " + String(pin_controller->getBlockedTime()));
-      break;
-  }
+    LockController::getInstance().init(&servo);
+
+    keypad_controller = new KeypadLockController(keypad);
+
+    mqtt_manager = new MqttManager();
+    mqtt_manager->setupWiFi();
+
+    ble_app_controller = new BleAppController();
+    ble_app_controller->init();
+    
+    ble_lock_controller = new BleLockController();
+    ble_lock_controller->init();
+
+    Serial.println("[System] Inicjalizacja zakończona pomyślnie. System gotowy.");
 }
 
-void loop(){
-  mqtt_manager->loop();
-  
-  pin_controller->update();
-  new_state = pin_controller->getState();
-  if(last_state!=new_state){
-    last_state = new_state;
-    handleFlags(new_state);
-  }
-  if(digitalRead(BUTTON) == LOW){
-    handleFlags(new_state);
-  }
-  delay(200);
-}
+void loop() {
+    LockController::getInstance().update(); 
+    
+    keypad_controller->update(); 
+    mqtt_manager->loop();
+    ble_app_controller->loop(); 
+    ble_lock_controller->update(); 
 
-int main(){
-  return 0;
+    LockSystemState currentState = LockController::getInstance().getCurrentState();
+    ActionSource currentSource = LockController::getInstance().getLastActionSource();
+    
+    if (currentState != lastSystemState) {
+        resetLeds(); 
+        
+        String sourceStr = sourceToString(currentSource);
+        
+        switch (currentState) {
+            case LockSystemState::IDLE_LOCKED:
+                mqtt_manager->publish("topicCinkus", (sourceStr + " : LOCKED").c_str());
+                break;
+                
+            case LockSystemState::ENTERING_PIN:
+                digitalWrite(BLUE_LED, HIGH);
+                mqtt_manager->publish("topicCinkus", (sourceStr + " : ENTERING_PIN").c_str());
+                break;
+                
+            case LockSystemState::CHANGING_PIN:
+                digitalWrite(BLUE_LED, HIGH);
+                mqtt_manager->publish("topicCinkus", (sourceStr + " : CHANGING_PIN").c_str());
+                break;
+                
+            case LockSystemState::UNLOCKED:
+                digitalWrite(GREEN_LED, HIGH);
+                mqtt_manager->publish("topicCinkus", (sourceStr + " : UNLOCKED").c_str());
+                break;
+                
+            case LockSystemState::BLOCKED_TEMP:
+                digitalWrite(RED_LED, HIGH);
+                mqtt_manager->publish("topicCinkus", (sourceStr + " : BLOCKED_TEMP").c_str());
+                break;
+        }
+        lastSystemState = currentState;
+    }
+
+    if (digitalRead(BUTTON) == LOW) {
+        delay(50);
+        if (digitalRead(BUTTON) == LOW) {
+            
+            ble_app_controller->startPairingMode();
+            
+            resetLeds();
+            digitalWrite(BLUE_LED, HIGH);
+            delay(200);
+            digitalWrite(BLUE_LED, LOW);
+            delay(200);
+            digitalWrite(BLUE_LED, HIGH);
+            delay(200);
+            digitalWrite(BLUE_LED, LOW);
+            
+            while(digitalRead(BUTTON) == LOW) { delay(10); } 
+            
+            lastSystemState = LockSystemState::BLOCKED_TEMP;
+        }
+    }
 }

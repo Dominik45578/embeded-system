@@ -130,3 +130,40 @@ void BleManager::manageAdvertising(BleAdvertisingMode mode) {
 int BleManager::getActiveConnectionsCount() const {
     return adapter_->getConnectedCount();
 }
+
+int BleManager::getPairedCount() const {
+    return adapter_->getPairedDeviceCount();
+}
+
+int BleManager::getAverageRssi() const {
+    std::vector<uint16_t> handles = adapter_->getConnectedHandles();
+    if (handles.empty()) {
+        return -100; // Brak połączonych klientów
+    }
+    
+    int totalRssi = 0;
+    for (uint16_t handle : handles) {
+        totalRssi += adapter_->getPeerRssi(handle);
+    }
+    
+    return totalRssi / handles.size(); // Uśredniamy sygnał dla wszystkich połączonych urządzeń
+}
+
+bool BleManager::updateAndNotify(const std::string& serviceUuid, const std::string& charUuid, const std::string& payload) {
+    NimBLEService* pService = adapter_->getServiceByUUID(serviceUuid);
+    if (!pService) {
+        Serial.println("[BleManager] Błąd: Nie znaleziono serwisu " + String(serviceUuid.c_str()));
+        return false;
+    }
+    
+    NimBLECharacteristic* pChar = adapter_->getCharacteristicByUUID(pService, charUuid);
+    if (!pChar) {
+         Serial.println("[BleManager] Błąd: Nie znaleziono charakterystyki " + String(charUuid.c_str()));
+         return false;
+    }
+
+    adapter_->setCharacteristicValue(pChar, payload);
+    adapter_->notifyClients(pChar, 0); 
+    
+    return true;
+}

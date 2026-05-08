@@ -84,7 +84,13 @@ private:
 // --- Główny Menedżer (BleManager) ---
 class BleManager {
 public:
-    BleManager(NimBleCoreAdapter* adapter);
+    static BleManager& getInstance() {
+        static BleManager instance(&NimBleCoreAdapter::getInstance());
+        return instance;
+    }
+
+    BleManager(const BleManager&) = delete;
+    BleManager& operator=(const BleManager&) = delete;
 
     void init(const std::string& deviceName);
 
@@ -96,7 +102,13 @@ public:
     void manageAdvertising(BleAdvertisingMode mode);
 
     int getActiveConnectionsCount() const;
+    int getPairedCount() const;
+    
+    int getAverageRssi() const;
+    
+    bool updateAndNotify(const std::string& serviceUuid, const std::string& charUuid, const std::string& payload);
 
 private:
     NimBleCoreAdapter* adapter_;
+    BleManager(NimBleCoreAdapter* adapter);
 };

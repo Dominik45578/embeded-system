@@ -278,3 +278,11 @@ void NimBleCoreAdapter::setOnMtuChangedCallback(BleDomain::MtuChangedCallback cb
 
 NimBLEServer* NimBleCoreAdapter::getRawServer() const { return pServer_; }
 NimBLEAdvertising* NimBleCoreAdapter::getRawAdvertising() const { return pAdvertising_; }
+// Dodaj na końcu pliku NimBleCoreAdapter.cpp:
+int NimBleCoreAdapter::getPeerRssi(uint16_t connHandle) const {
+    int8_t rssi = 0;
+    if (ble_gap_conn_rssi(connHandle, &rssi) == 0) {
+        return rssi;
+    }
+    return -150; 
+}
