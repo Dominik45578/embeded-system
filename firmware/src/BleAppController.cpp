@@ -5,6 +5,7 @@ BleAppController::BleAppController() : currentState(BleAppState::OFF) {}
 void BleAppController::init() {
     Serial.println("[BleAppController] Inicjalizacja bluetooth....");
     BleManager::getInstance().init("Lockly-Zamek");
+    BleManager::getInstance().manageAdvertising(BleAdvertisingMode::FAST);
 
 
     Serial.println("[BleAppController] Inicjalizacja kontrolera...");
@@ -53,8 +54,6 @@ void BleAppController::startPairingMode() {
 void BleAppController::changeState(BleAppState newState) {
     currentState = newState;
     stateEnterMillis = millis();
-    
-    Serial.print("[BleAppController] Zmiana stanu na: ");
     switch(newState) {
         case BleAppState::OFF: Serial.println("OFF"); break;
         case BleAppState::PAIRING: Serial.println("PAIRING"); break;
@@ -141,10 +140,6 @@ void BleAppController::checkConnectionQualityAndAdjustPower() {
     }
 
     if (newProfile != lastProfile) {
-        Serial.print("[BleAppController] Jakość sygnału: ");
-        Serial.print(currentRssi);
-        Serial.println(" dBm. Aktualizuję moc anteny.");
-        
         BleManager::getInstance().setPerformanceProfile(newProfile);
         lastProfile = newProfile;
     }

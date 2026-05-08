@@ -28,7 +28,6 @@ CharacteristicBuilder& CharacteristicBuilder::notifyAccess() {
 
 CharacteristicBuilder& CharacteristicBuilder::onWrite(std::function<void(const std::string&)> callback) {
     if (!callbackHandler_) {
-        // Alokujemy nowy handler. Będzie on przypisany do charakterystyki na cały czas życia aplikacji
         callbackHandler_ = new CharacteristicCallbackHandler();
     }
     callbackHandler_->setWriteCallback(callback);
@@ -36,10 +35,8 @@ CharacteristicBuilder& CharacteristicBuilder::onWrite(std::function<void(const s
 }
 
 ServiceBuilder& CharacteristicBuilder::buildCharacteristic() {
-    // 1. Tworzymy charakterystykę w adapterze z zebranymi prawami dostępu
     NimBLECharacteristic* pChar = adapter_->createCharacteristic(pService_, uuid_, properties_);
     
-    // 2. Jeśli dodano jakieś zdarzenia (np. onWrite), przypisujemy handler
     if (callbackHandler_ && pChar) {
         adapter_->setCharacteristicCallbacks(pChar, callbackHandler_);
     }
@@ -89,7 +86,6 @@ void BleManager::setPerformanceProfile(BlePerformanceProfile profile) {
             // Maksymalna wydajność: indeks 7 w kPowerLevelToDbm w adapterze (9 dBm)
             adapter_->setTxPower(static_cast<BleDomain::BlePowerLevel>(7)); 
             adapter_->optimizeForDataTransfer(512); // Maksymalne MTU
-            Serial.println("[BLE] Profil: OTA UPDATE (Max Performance)");
             break;
             
         case BlePerformanceProfile::ECO:
@@ -97,14 +93,12 @@ void BleManager::setPerformanceProfile(BlePerformanceProfile profile) {
             adapter_->setTxPower(static_cast<BleDomain::BlePowerLevel>(0));
             // standardowe MTU
             adapter_->optimizeForDataTransfer(23);
-            Serial.println("[BLE] Profil: ECO (Low Power)");
             break;
 
         case BlePerformanceProfile::STANDARD:
             // Zbalansowana moc: indeks 4 (0 dBm)
             adapter_->setTxPower(static_cast<BleDomain::BlePowerLevel>(4));
             adapter_->optimizeForDataTransfer(256);
-            Serial.println("[BLE] Profil: STANDARD");
             break;
     }
 }
@@ -112,7 +106,6 @@ void BleManager::setPerformanceProfile(BlePerformanceProfile profile) {
 void BleManager::manageAdvertising(BleAdvertisingMode mode) {
     switch(mode) {
         case BleAdvertisingMode::FAST:
-            // Ustawienia w tickach 0.625ms (0x20 = 20ms, 0x40 = 40ms)
             adapter_->setAdvertisingIntervals(0x20, 0x40);
             adapter_->startAdvertising(0);
             break;

@@ -4,6 +4,7 @@
 #include <functional>
 #include <NimBLEDevice.h>
 #include "BleDomain.hpp"
+#include <Arduino.h>
 
 class NimBleCoreAdapter {
 

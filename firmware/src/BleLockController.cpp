@@ -12,6 +12,8 @@ void BleLockController::init() {
         .addCharacteristic("FF21")
             .writeAccess()
             .onWrite([this](const std::string& data) {
+                Serial.print("Odebrano : ");
+                Serial.println(data.c_str());
                 String payload = String(data.c_str());
                 payload.trim(); // Usuwamy białe znaki
                 this->handleCommand(payload);

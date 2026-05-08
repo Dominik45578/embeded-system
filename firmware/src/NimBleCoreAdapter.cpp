@@ -239,7 +239,10 @@ bool NimBleCoreAdapter::updateConnectionParams(uint16_t connHandle, const BleDom
 }
 
 void NimBleCoreAdapter::startAdvertising(uint32_t durationMs) {
-    if (!pAdvertising_) return;
+    if (!pAdvertising_){
+        Serial.println("pAdver.. is NULL");
+        return;
+    }
     if (durationMs > 0) NimBLEDevice::startAdvertising(durationMs);
     else NimBLEDevice::startAdvertising();
 }
