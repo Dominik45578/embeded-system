@@ -1,16 +1,19 @@
 package com.example.backend.config;
 
-import com.influxdb.v3.client.InfluxDBClient;
+import com.influxdb.client.InfluxDBClient;
+import com.influxdb.client.InfluxDBClientFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@EnableConfigurationProperties(InfluxProperties.class)
 public class InfluxConfig {
 
     @Bean
-    public InfluxDBClient influxDBClient(@Value("${BACKEND.INFLUX.HOST}") String host, @Value("${BACKEND.INFLUX.TOKEN}") String token, @Value("${BACKEND.INFLUX.DATABASE}") String db) {
-        return InfluxDBClient.getInstance(host, token.toCharArray(), db);
+    public InfluxDBClient influxDBClient(InfluxProperties properties) {
+        return InfluxDBClientFactory.create(properties.getHost(), properties.getToken().toCharArray(), properties.getOrg(), properties.getBucket());
     }
 
 }

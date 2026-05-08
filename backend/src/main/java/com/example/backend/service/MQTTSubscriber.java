@@ -1,32 +1,63 @@
 package com.example.backend.service;
 
 import com.example.backend.model.LockReceivePayload;
-import com.influxdb.v3.client.InfluxDBClient;
-import com.influxdb.v3.client.Point;
+import com.influxdb.client.InfluxDBClient;
+import com.influxdb.client.WriteApiBlocking;
+import com.influxdb.client.domain.WritePrecision;
+import com.influxdb.client.write.Point;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.eclipse.paho.client.mqttv3.IMqttMessageListener;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.Set;
+
 @Component
 @RequiredArgsConstructor
 class MQTTSubscriber implements IMqttMessageListener {
     private final ObjectMapper objectMapper;
     private final InfluxDBClient influxDBClient;
+    private final Validator validator;
 
     @Override
     public void messageArrived(String s, MqttMessage mqttMessage) {
+        LockReceivePayload lockReceivePayload;
+
         String rawPayload = new String(mqttMessage.getPayload());
-        LockReceivePayload lockReceivePayload = objectMapper.readValue(rawPayload, LockReceivePayload.class);
-        System.out.println("Received from MQTT: " + lockReceivePayload);
+        System.out.println("Received from MQTT: " + rawPayload);
+
+        try {
+            lockReceivePayload = objectMapper.readValue(rawPayload, LockReceivePayload.class);
+        }
+        catch (Exception e) {
+            System.err.println("Failed to parse MQTT message: " + e.getMessage());
+            return;
+        }
+
+        Set<ConstraintViolation<LockReceivePayload>> violations = validator.validate(lockReceivePayload);
+        if (!violations.isEmpty()) {
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.append("MQTT message is invalid: [");
+
+            for (ConstraintViolation<LockReceivePayload> violation : violations) {
+                stringBuilder.append(violation.getPropertyPath()).append(": ").append(violation.getMessage()).append("; ");
+            }
+
+            stringBuilder.append("]");
+            System.err.println(stringBuilder);
+            return;
+        }
 
         Point point = Point.measurement("lock")
-                .setTag("deviceId", lockReceivePayload.deviceId())
-                .setField("lockState", lockReceivePayload.lockState().ordinal())
-                .setTimestamp(lockReceivePayload.timestamp());
+                .addTag("deviceId", lockReceivePayload.deviceId())
+                .addField("lockState", lockReceivePayload.lockState().ordinal())
+                .time(lockReceivePayload.timestamp(), WritePrecision.MS);
         try {
-            influxDBClient.writePoint(point);
+            WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
+            writeApi.writePoint(point);
             System.out.println("Data has been saved to Influx");
         }
         catch (Exception e) {
