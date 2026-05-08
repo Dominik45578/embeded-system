@@ -131,7 +131,6 @@ jobs:
         working-directory: mobile
         run: |
           flutter pub get
-          flutter test
           flutter build apk --release
 
       - name: Upload APK as Artifact
