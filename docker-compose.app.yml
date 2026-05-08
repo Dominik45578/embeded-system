@@ -16,9 +16,57 @@ services:
     networks:
       - app_network
 
+  influxdb3-init:
+    image: busybox
+    container_name: iot_influxdb3-init
+    user: "0:0"
+    volumes:
+      - influx_data:/var/lib/influxdb3/data
+      - influx_plugins:/var/lib/influxdb3/plugins
+    command: >
+      sh -c "chown -R 1000:1000 /var/lib/influxdb3/data /var/lib/influxdb3/plugins"
+
+  influxdb3-core:
+    container_name: iot_influxdb3-core
+    image: 'influxdb:3-core'
+    ports:
+      - '${INFLUX_DB_PORT}:8181'
+    command:
+      - influxdb3
+      - serve
+      - '--node-id=node0'
+      - '--object-store=file'
+      - '--data-dir=/var/lib/influxdb3/data'
+      - '--plugin-dir=/var/lib/influxdb3/plugins'
+    volumes:
+      - influx_data:/var/lib/influxdb3/data
+      - influx_plugins:/var/lib/influxdb3/plugins
+    networks:
+      - app_network
+    user: "1000:1000"
+    depends_on:
+      influxdb3-init:
+        condition: service_completed_successfully
+
+  influxdb3-explorer:
+    container_name: iot_influxdb3-explorer
+    image: 'influxdata/influxdb3-ui:1.8.0'
+    ports:
+      - '${INFLUX_EXPLORER_PORT}:8080'
+    volumes:
+        - explorer_db:/db
+        - explorer_config:/app-root/config
+    networks:
+      - app_network
+    command: [ "--mode=admin" ]
+
 volumes:
   mosquitto_data:
   mosquitto_log:
+  influx_data:
+  influx_plugins:
+  explorer_db:
+  explorer_config:
 
 networks:
   app_network:
