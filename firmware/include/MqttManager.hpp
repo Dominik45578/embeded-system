@@ -7,8 +7,8 @@
 class MqttManager
 {
 private:
-    const char* ssid = "cin";
-    const char* password = "12345678";
+    const char* ssid = "iPhone (Dominik)";
+    const char* password = "x12345678x@";
     const char* mqtt_server = "broker.mqtt-dashboard.com";
 
     WiFiClient espClient;
