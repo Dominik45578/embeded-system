@@ -8,6 +8,7 @@ import com.influxdb.client.write.Point;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.eclipse.paho.client.mqttv3.IMqttMessageListener;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,7 @@ import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 class MQTTSubscriber implements IMqttMessageListener {
     private final ObjectMapper objectMapper;
     private final InfluxDBClient influxDBClient;
@@ -27,13 +29,13 @@ class MQTTSubscriber implements IMqttMessageListener {
         LockReceivePayload lockReceivePayload;
 
         String rawPayload = new String(mqttMessage.getPayload());
-        System.out.println("Received from MQTT: " + rawPayload);
+        log.debug("Received from MQTT: {}", rawPayload);
 
         try {
             lockReceivePayload = objectMapper.readValue(rawPayload, LockReceivePayload.class);
         }
         catch (Exception e) {
-            System.err.println("Failed to parse MQTT message: " + e.getMessage());
+            log.warn("Failed to parse MQTT message: {}", e.getMessage());
             return;
         }
 
@@ -47,7 +49,7 @@ class MQTTSubscriber implements IMqttMessageListener {
             }
 
             stringBuilder.append("]");
-            System.err.println(stringBuilder);
+            log.warn(stringBuilder.toString());
             return;
         }
 
@@ -58,10 +60,10 @@ class MQTTSubscriber implements IMqttMessageListener {
         try {
             WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
             writeApi.writePoint(point);
-            System.out.println("Data has been saved to Influx");
+            log.debug("Data has been saved to Influx");
         }
         catch (Exception e) {
-            System.err.println("Failed to save data to Influx");
+            log.error("Failed to save data to Influx");
             e.printStackTrace();
         }
     }

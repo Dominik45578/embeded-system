@@ -6,20 +6,15 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
-@ConfigurationProperties(prefix = "backend.influx")
+@ConfigurationProperties(prefix = "backend.mqtt")
 @Validated
 @Getter
 @Setter
-public class InfluxProperties {
+public class MqttProperties {
     @NotBlank
     private String host;
 
     @NotBlank
-    private String token;
-
-    @NotBlank
-    private String bucket;
-
-    @NotBlank
-    private String org;
+    private String topic;
 }
+
