@@ -8,7 +8,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.6</version>
+        <version>3.5.7</version>
         <relativePath/>
     </parent>
 
@@ -29,7 +29,7 @@
         <java.version>21</java.version>
 
         <!-- SPRING -->
-        <spring-boot.version>4.0.6</spring-boot.version>
+        <spring-boot.version>3.5.7</spring-boot.version>
 
         <!-- LIBRARIES -->
         <lombok.version>1.18.46</lombok.version>
@@ -42,7 +42,7 @@
 
         <!-- MAVEN -->
         <maven-compiler-plugin.version>3.14.0</maven-compiler-plugin.version>
-        <spring-boot-maven-plugin.version>4.0.6</spring-boot-maven-plugin.version>
+        <spring-boot-maven-plugin.version>3.5.7</spring-boot-maven-plugin.version>
 
     </properties>
 
@@ -76,13 +76,6 @@
                 <scope>test</scope>
             </dependency>
 
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-security-test</artifactId>
-                <version>${spring-boot.version}</version>
-                <scope>test</scope>
-            </dependency>
-
             <!-- MAPSTRUCT -->
 
             <dependency>
@@ -112,14 +105,14 @@
             <dependency>
                 <groupId>org.flywaydb</groupId>
                 <artifactId>flyway-core</artifactId>
-                <version>12.6.0</version>
+                <version>${flyway.version}</version>
                 <scope>compile</scope>
             </dependency>
 
             <dependency>
                 <groupId>org.flywaydb</groupId>
                 <artifactId>flyway-database-postgresql</artifactId>
-                <version>12.6.0</version>
+                <version>${flyway.version}</version>
                 <scope>runtime</scope>
             </dependency>
 
@@ -128,7 +121,7 @@
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-starter-data-jpa</artifactId>
-                <version>4.0.6</version>
+                <version>${spring-boot.version}</version>
                 <scope>compile</scope>
             </dependency>
             <!-- MQTT -->

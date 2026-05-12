@@ -6,4 +6,4 @@ spring:
 
 firebase:
   key:
-    path: C:\Users\Dominik\IdeaProjects\EmbedeLockSystem\backend\firebase-integration\serviceAccountKey.json
+    path: ${FIREBASE_KEY_PATH}

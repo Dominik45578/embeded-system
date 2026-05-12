@@ -26,6 +26,20 @@ CharacteristicBuilder& CharacteristicBuilder::notifyAccess() {
     return *this;
 }
 
+CharacteristicBuilder& CharacteristicBuilder::encryptedReadAccess() {
+    using CP = BleDomain::CharacteristicProperty;
+    properties_ |= static_cast<uint32_t>(CP::READ);
+    properties_ |= static_cast<uint32_t>(CP::READ_ENC);
+    return *this;
+}
+
+CharacteristicBuilder& CharacteristicBuilder::encryptedWriteAccess() {
+    using CP = BleDomain::CharacteristicProperty;
+    properties_ |= static_cast<uint32_t>(CP::WRITE);
+    properties_ |= static_cast<uint32_t>(CP::WRITE_ENC); 
+    return *this;
+}
+
 CharacteristicBuilder& CharacteristicBuilder::onWrite(std::function<void(const std::string&)> callback) {
     if (!callbackHandler_) {
         callbackHandler_ = new CharacteristicCallbackHandler();
@@ -44,13 +58,8 @@ ServiceBuilder& CharacteristicBuilder::buildCharacteristic() {
     return *parent_;
 }
 
-// ==========================================
-// SERVICE BUILDER
-// ==========================================
-
 ServiceBuilder::ServiceBuilder(const std::string& uuid, NimBleCoreAdapter* adapter, BleManager* manager)
     : uuid_(uuid), adapter_(adapter), manager_(manager) {
-    // Od razu zlecamy adapterowi rezerwację miejsca na serwis
     pService_ = adapter_->createService(uuid_);
 }
 
@@ -59,21 +68,21 @@ CharacteristicBuilder ServiceBuilder::addCharacteristic(const std::string& uuid)
 }
 
 BleManager& ServiceBuilder::buildService() {
-    // Uruchamiamy serwis, aby był widoczny
     adapter_->startService(pService_);
     return *manager_;
 }
 
-// ==========================================
-// BLE MANAGER
-// ==========================================
 
 BleManager::BleManager(NimBleCoreAdapter* adapter) : adapter_(adapter) {}
 
 void BleManager::init(const std::string& deviceName) {
     adapter_->powerOn(deviceName);
-    // Ustawiamy parowanie z domyślnymi parametrami na start
+    
     adapter_->setPairingMode(BleDomain::FeatureState::ENABLE);
+    adapter_->setBonding(BleDomain::FeatureState::ENABLE);
+    
+    adapter_->setMitmProtection(BleDomain::FeatureState::DISABLE);
+    adapter_->setSecureConnections(BleDomain::FeatureState::ENABLE);
 }
 
 ServiceBuilder BleManager::createNewService(const std::string& uuid) {
@@ -83,20 +92,16 @@ ServiceBuilder BleManager::createNewService(const std::string& uuid) {
 void BleManager::setPerformanceProfile(BlePerformanceProfile profile) {
     switch(profile) {
         case BlePerformanceProfile::OTA_UPDATE:
-            // Maksymalna wydajność: indeks 7 w kPowerLevelToDbm w adapterze (9 dBm)
             adapter_->setTxPower(static_cast<BleDomain::BlePowerLevel>(7)); 
             adapter_->optimizeForDataTransfer(512); // Maksymalne MTU
             break;
             
         case BlePerformanceProfile::ECO:
-            // Minimalna moc: indeks 0 w kPowerLevelToDbm w adapterze (-12 dBm)
             adapter_->setTxPower(static_cast<BleDomain::BlePowerLevel>(0));
-            // standardowe MTU
             adapter_->optimizeForDataTransfer(23);
             break;
 
         case BlePerformanceProfile::STANDARD:
-            // Zbalansowana moc: indeks 4 (0 dBm)
             adapter_->setTxPower(static_cast<BleDomain::BlePowerLevel>(4));
             adapter_->optimizeForDataTransfer(256);
             break;
@@ -110,7 +115,6 @@ void BleManager::manageAdvertising(BleAdvertisingMode mode) {
             adapter_->startAdvertising(0);
             break;
         case BleAdvertisingMode::SLOW:
-            // Interwały rzędu setek milisekund
             adapter_->setAdvertisingIntervals(0x100, 0x200);
             adapter_->startAdvertising(0);
             break;
@@ -131,15 +135,14 @@ int BleManager::getPairedCount() const {
 int BleManager::getAverageRssi() const {
     std::vector<uint16_t> handles = adapter_->getConnectedHandles();
     if (handles.empty()) {
-        return -100; // Brak połączonych klientów
+        return -100;
     }
-    
     int totalRssi = 0;
     for (uint16_t handle : handles) {
         totalRssi += adapter_->getPeerRssi(handle);
     }
     
-    return totalRssi / handles.size(); // Uśredniamy sygnał dla wszystkich połączonych urządzeń
+    return totalRssi / handles.size();
 }
 
 bool BleManager::updateAndNotify(const std::string& serviceUuid, const std::string& charUuid, const std::string& payload) {

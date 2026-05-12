@@ -10,7 +10,7 @@ void BleLockController::init() {
     BleManager::getInstance().createNewService("FF20")
         
         .addCharacteristic("FF21")
-            .writeAccess()
+            .encryptedWriteAccess()
             .onWrite([this](const std::string& data) {
                 Serial.print("Odebrano : ");
                 Serial.println(data.c_str());
@@ -21,7 +21,7 @@ void BleLockController::init() {
             .buildCharacteristic()
 
         .addCharacteristic("FF22")
-            .readAccess()
+            .encryptedReadAccess()
             .notifyAccess()
             .buildCharacteristic()
 

@@ -11,7 +11,7 @@ void BleAppController::init() {
     Serial.println("[BleAppController] Inicjalizacja kontrolera...");
     BleManager::getInstance().createNewService("FF10")
         .addCharacteristic("FF11")
-            .readAccess()
+            .encryptedReadAccess()
             .notifyAccess()
             .buildCharacteristic()
         .buildService();

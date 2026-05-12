@@ -2,28 +2,41 @@ name: iot-application
 
 services:
   mqtt-broker:
+    env_file:
+      - .env.app
+    profiles:
+      - app
     image: eclipse-mosquitto:${MOSQUITTO_VERSION}
     container_name: iot_mqtt_broker
     ports:
       - "${MQTT_PORT}:1883"
     volumes:
-      # Montujemy plik konfiguracyjny (wymagane w Mosquitto 2.0+)
       - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      # Wolumeny na dane (trwałość wiadomości z QoS 1 i 2) oraz logi
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
     restart: unless-stopped
+    # healthcheck:
+    #   test: ["CMD-SHELL", "echo > /dev/tcp/localhost/1883"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    #   start_period: 10s
     networks:
       - app_network
 
   influxdb:
+    env_file:
+      - .env.app
+    profiles:
+      - app
     container_name: iot_influxdb
-    image: 'influxdb:2.7'
+    image: influxdb:2.7
     ports:
-      - '${INFLUX_DB_PORT}:8086'
+      - "${INFLUX_DB_PORT}:8086"
     volumes:
       - influx_data:/var/lib/influxdb2
       - influx_config:/etc/influxdb2
+    restart: unless-stopped
     networks:
       - app_network
     environment:
@@ -32,12 +45,110 @@ services:
       DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_INIT_PASSWORD}
       DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_INIT_ORG}
       DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_INIT_BUCKET}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  mqtt-scaner:
+    env_file:
+      - .env.app
+    profiles:
+      - app
+    build:
+      context: ./backend/mqtt-scaner
+      dockerfile: Dockerfile
+    container_name: iot_mqtt_scaner
+    ports:
+      - "12200:12200"
+    restart: unless-stopped
+    environment:
+      - MQTT_BROKER_HOST=mqtt-broker
+      - MQTT_BROKER_PORT=${MQTT_PORT}
+      - INFLUXDB_HOST=influxdb
+      - INFLUXDB_PORT=${INFLUX_DB_PORT}
+      - INFLUXDB_BUCKET=${INFLUXDB_INIT_BUCKET}
+      - INFLUXDB_ORG=${INFLUXDB_INIT_ORG}
+      - INFLUXDB_USERNAME=${INFLUXDB_INIT_USERNAME}
+      - INFLUXDB_PASSWORD=${INFLUXDB_INIT_PASSWORD}
+      - BACKEND_PORT=${BACKEND_PORT}
+      - SPRING_PROFILES_ACTIVE=prod
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/${DATABASE_NAME}
+      - INFLUXDB_HOST=influxdb
+    depends_on:
+      mqtt-broker:
+        condition: service_started
+      influxdb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  firebase-integration:
+    env_file:
+      - .env.app
+    profiles:
+      - app
+    ports:
+      - "12100:12100"
+    build:
+      context: ./backend/firebase-integration
+      dockerfile: Dockerfile
+    container_name: iot_firebase_integration
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/${DATABASE_NAME}
+      - SERVER_PORT=12100
+      - FIREBASE_KEY_PATH=/app/config/serviceAccountKey.json
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:12100/actuator/health"]
+    #   interval: 15s
+    #   timeout: 5s
+    #   retries: 5
+    #   start_period: 30s
+    volumes:
+      - ./backend/firebase-integration/serviceAccountKey.json:/app/config/serviceAccountKey.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  postgres:
+    env_file:
+      - .env.app
+    profiles:
+      - app
+    image: postgres:16-alpine
+    container_name: iot_postgres
+    restart: unless-stopped
+    ports:
+      - "${DATABASE_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME} -d ${DATABASE_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - app_network
 
 volumes:
   mosquitto_data:
   mosquitto_log:
   influx_data:
   influx_config:
+  postgres_data:
   explorer_db:
   explorer_config:
 

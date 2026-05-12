@@ -46,6 +46,9 @@ public:
     CharacteristicBuilder& readAccess();
     CharacteristicBuilder& writeAccess();
     CharacteristicBuilder& notifyAccess();
+
+    CharacteristicBuilder& encryptedReadAccess();
+    CharacteristicBuilder& encryptedWriteAccess();
     
     CharacteristicBuilder& onWrite(std::function<void(const std::string&)> callback);
 
