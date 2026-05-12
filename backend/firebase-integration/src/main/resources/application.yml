@@ -1,0 +1,9 @@
+server:
+  port: 12100
+spring:
+  application:
+    name: firebase-integration-service
+
+firebase:
+  key:
+    path: C:\Users\Dominik\IdeaProjects\EmbedeLockSystem\backend\firebase-integration\serviceAccountKey.json
