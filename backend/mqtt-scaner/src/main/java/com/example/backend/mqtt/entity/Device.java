@@ -1,6 +1,7 @@
 package com.example.backend.mqtt.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 @Entity
@@ -22,6 +23,10 @@ public class Device {
     @Builder.Default
     @Column(nullable = false)
     private boolean blocked = false;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private String deviceName = "default_device";
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_firebase_id")

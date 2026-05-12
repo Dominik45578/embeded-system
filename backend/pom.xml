@@ -84,6 +84,13 @@
                 <version>${mapstruct.version}</version>
             </dependency>
 
+            <!-- Source: https://mvnrepository.com/artifact/com.rabbitmq/amqp-client -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-amqp</artifactId>
+                <version>${spring-boot.version}</version>
+            </dependency>
+
             <!-- LOMBOK -->
 
             <dependency>
