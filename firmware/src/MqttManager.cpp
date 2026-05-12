@@ -62,7 +62,7 @@ void MqttManager::loop() {
     client.loop();
 }
 
-void MqttManager::publish(const String& topic, const char* message) {
+void MqttManager::publish(const String& topic, const MqttMessage message) {
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("Cannot publish due to Wifi error");
         return;
@@ -72,7 +72,15 @@ void MqttManager::publish(const String& topic, const char* message) {
         reconnect();
     }
 
-    boolean success = client.publish(topic.c_str(), message);
+    doc["deviceId"] = message.getDeviceId();
+    doc["lockState"] = message.getLockState();
+    doc["source"] = message.getSource();
+    doc["timeStamp"] = message.getTimeStamp();
+
+    String outputJson = "";
+    serializeJson(doc, outputJson);
+
+    boolean success = client.publish(topic.c_str(), outputJson.c_str());
     Serial.println("Sent?:");
     Serial.println(success);
 }
