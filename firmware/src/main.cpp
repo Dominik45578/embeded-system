@@ -15,6 +15,8 @@ BleLockController* ble_lock_controller;
 
 LockSystemState lastSystemState = LockSystemState::IDLE_LOCKED;
 
+const String DEVICE_ID = "DzWord=CWord";
+
 void resetLeds() {
     digitalWrite(RED_LED, LOW);
     digitalWrite(GREEN_LED, LOW);
@@ -31,9 +33,22 @@ String sourceToString(ActionSource source) {
     }
 }
 
+
+String stateToString(LockSystemState state) {
+    switch (state) {
+        case LockSystemState::IDLE_LOCKED:   return "IDLE_LOCKED";
+        case LockSystemState::ENTERING_PIN:  return "ENTERING_PIN";
+        case LockSystemState::CHANGING_PIN:  return "CHANGING_PIN";
+        case LockSystemState::UNLOCKED:      return "UNLOCKED";
+        case LockSystemState::BLOCKED_TEMP:  return "BLOCKED_TEMP";
+        default:                             return "UNKNOWN";
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     Serial.println("[System] Uruchamianie zamka...");
+    configTime(3600, 3600, "pool.ntp.org", "time.nist.gov");
     
     pinMode(RED_LED, OUTPUT);
     pinMode(GREEN_LED, OUTPUT);
@@ -78,30 +93,31 @@ void loop() {
         resetLeds(); 
         
         String sourceStr = sourceToString(currentSource);
+        MqttMessage mqttMessage = MqttMessage(DEVICE_ID, stateToString(currentState), sourceStr);
         
         switch (currentState) {
             case LockSystemState::IDLE_LOCKED:
-                mqtt_manager->publish("topicCinkus", (sourceStr + " : LOCKED").c_str());
+                mqtt_manager->publish("topicCinkus", mqttMessage);
                 break;
                 
             case LockSystemState::ENTERING_PIN:
                 digitalWrite(BLUE_LED, HIGH);
-                mqtt_manager->publish("topicCinkus", (sourceStr + " : ENTERING_PIN").c_str());
+                mqtt_manager->publish("topicCinkus", mqttMessage);
                 break;
                 
             case LockSystemState::CHANGING_PIN:
                 digitalWrite(BLUE_LED, HIGH);
-                mqtt_manager->publish("topicCinkus", (sourceStr + " : CHANGING_PIN").c_str());
+                mqtt_manager->publish("topicCinkus", mqttMessage);
                 break;
                 
             case LockSystemState::UNLOCKED:
                 digitalWrite(GREEN_LED, HIGH);
-                mqtt_manager->publish("topicCinkus", (sourceStr + " : UNLOCKED").c_str());
+                mqtt_manager->publish("topicCinkus", mqttMessage);
                 break;
                 
             case LockSystemState::BLOCKED_TEMP:
                 digitalWrite(RED_LED, HIGH);
-                mqtt_manager->publish("topicCinkus", (sourceStr + " : BLOCKED_TEMP").c_str());
+                mqtt_manager->publish("topicCinkus", mqttMessage);
                 break;
         }
         lastSystemState = currentState;
