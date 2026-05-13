@@ -19,6 +19,7 @@
     <packaging>pom</packaging>
 
     <modules>
+        <module>common</module>
         <module>firebase-integration</module>
         <module>mqtt-scaner</module>
     </modules>
@@ -40,6 +41,9 @@
         <mqtt.version>1.2.0</mqtt.version>
         <influxdb.version>3.3.0</influxdb.version>
 
+        <grpc.version>1.63.0</grpc.version>
+        <protobuf.version>3.25.3</protobuf.version>
+
         <!-- MAVEN -->
         <maven-compiler-plugin.version>3.14.0</maven-compiler-plugin.version>
         <spring-boot-maven-plugin.version>3.5.7</spring-boot-maven-plugin.version>
@@ -48,6 +52,24 @@
 
     <dependencyManagement>
         <dependencies>
+
+            <!-- gRPC BOM -->
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-bom</artifactId>
+                <version>${grpc.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Protobuf BOM -->
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-bom</artifactId>
+                <version>${protobuf.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
 
             <!-- SPRING -->
 

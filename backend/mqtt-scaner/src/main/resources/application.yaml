@@ -41,3 +41,9 @@ backend:
     org: ${BACKEND_INFLUX_ORG}
 server:
   port: 12200
+
+grpc:
+  client:
+    firebase-auth:
+      address: ${GRPC_FIREBASE_INTEG_ADRES}
+      negotiation-type: plaintext
