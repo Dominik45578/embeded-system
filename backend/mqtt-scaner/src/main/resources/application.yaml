@@ -24,6 +24,12 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
+  rabbitmq:
+      host: ${RABBITMQ_HOST:localhost}
+      port: ${RABBITMQ_PORT:5672}
+      username: ${RABBITMQ_USERNAME:guest}
+      password: ${RABBITMQ_PASSWORD:guest}
+
 backend:
   mqtt:
     host: ${BACKEND_MQTT_HOST}
@@ -35,3 +41,9 @@ backend:
     org: ${BACKEND_INFLUX_ORG}
 server:
   port: 12200
+
+grpc:
+  client:
+    firebase-auth:
+      address: ${GRPC_FIREBASE_INTEG_ADRES}
+      negotiation-type: plaintext
