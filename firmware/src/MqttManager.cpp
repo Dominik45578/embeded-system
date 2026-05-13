@@ -71,7 +71,7 @@ void MqttManager::callback(char* topic, byte* payload, unsigned int length) {
     JsonDocument doc;
     deserializeJson(doc, payload);
     
-    const char* action = doc["action"];
+    const char* action = doc["command"];
 
     if(strcmp(action, "UNLOCK") == 0){
         Serial.println("Otrzymano prosbe o zdalne otwarcie zamkna (WiFi)");
