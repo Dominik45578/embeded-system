@@ -45,6 +45,9 @@ public:
     
     // Natychmiastowa próba autoryzacji (z gotowym kodem)
     ActionResult attemptUnlock(const String& pinAttempt, ActionSource source);
+
+    // Wymuszenie otwarcia (np. przez Flutter / Backend)
+    ActionResult forceUnlock(ActionSource source);
     
     // Bezpieczna zmiana PIN-u z weryfikacją starego
     ActionResult changePin(const String& oldPin, const String& newPin, ActionSource source);

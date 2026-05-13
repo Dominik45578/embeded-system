@@ -7,6 +7,9 @@
 #include "MqttManager.hpp"
 #include "LockController.hpp"
 
+const char* DEVICE_ID = "DzWord=CWord";
+const char* GLOBAL_TOPIC = "topicCinkus";
+
 LedcSerwoManager servo;
 MqttManager* mqtt_manager;
 KeypadLockController* keypad_controller;
@@ -15,7 +18,7 @@ BleLockController* ble_lock_controller;
 
 LockSystemState lastSystemState = LockSystemState::IDLE_LOCKED;
 
-const String DEVICE_ID = "DzWord=CWord";
+
 
 void resetLeds() {
     digitalWrite(RED_LED, LOW);
@@ -66,7 +69,7 @@ void setup() {
 
     keypad_controller = new KeypadLockController(keypad);
 
-    mqtt_manager = new MqttManager();
+    mqtt_manager = new MqttManager(GLOBAL_TOPIC, DEVICE_ID);
     mqtt_manager->setupWiFi();
 
     ble_app_controller = new BleAppController();
@@ -93,33 +96,10 @@ void loop() {
         resetLeds(); 
         
         String sourceStr = sourceToString(currentSource);
+
         MqttMessage mqttMessage = MqttMessage(DEVICE_ID, stateToString(currentState), sourceStr);
+        mqtt_manager->publish(mqttMessage);
         
-        switch (currentState) {
-            case LockSystemState::IDLE_LOCKED:
-                mqtt_manager->publish("topicCinkus", mqttMessage);
-                break;
-                
-            case LockSystemState::ENTERING_PIN:
-                digitalWrite(BLUE_LED, HIGH);
-                mqtt_manager->publish("topicCinkus", mqttMessage);
-                break;
-                
-            case LockSystemState::CHANGING_PIN:
-                digitalWrite(BLUE_LED, HIGH);
-                mqtt_manager->publish("topicCinkus", mqttMessage);
-                break;
-                
-            case LockSystemState::UNLOCKED:
-                digitalWrite(GREEN_LED, HIGH);
-                mqtt_manager->publish("topicCinkus", mqttMessage);
-                break;
-                
-            case LockSystemState::BLOCKED_TEMP:
-                digitalWrite(RED_LED, HIGH);
-                mqtt_manager->publish("topicCinkus", mqttMessage);
-                break;
-        }
         lastSystemState = currentState;
     }
 

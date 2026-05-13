@@ -57,6 +57,10 @@ void LockController::notifyActivity(LockSystemState state, ActionSource source) 
     }
 }
 
+ActionResult LockController::forceUnlock(ActionSource source){
+    return attemptUnlock(currentPin_, source);
+}
+
 ActionResult LockController::attemptUnlock(const String& pinAttempt, ActionSource source) {
     if (xSemaphoreTake(lockMutex_, portMAX_DELAY) == pdTRUE) {
         

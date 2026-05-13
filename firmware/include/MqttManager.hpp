@@ -12,6 +12,8 @@ private:
     const char* ssid = "cin";
     const char* password = "12345678";
     const char* mqtt_server = "broker.mqtt-dashboard.com";
+    const char* global_topic;
+    const char* device_topic;
 
     WiFiClient espClient;
     PubSubClient client;
@@ -20,11 +22,12 @@ private:
     void reconnect();
 
 public:
-    MqttManager();
+    MqttManager(const char* global_topic, const char* device_topic);
     ~MqttManager();
     void setupWiFi();
     void loop();
-    void publish(const String& topic, const MqttMessage message);
+    void callback(char* topic, byte* payload, unsigned int length);
+    void publish(const MqttMessage message);
 };
 
 #endif // MQTT_MANAGER_HPP
