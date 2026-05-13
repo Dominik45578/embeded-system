@@ -1,10 +1,12 @@
 package com.example.backend.mqtt.controller;
 
+import com.example.backend.mqtt.dto.request.AddDeviceRequest;
 import com.example.backend.mqtt.dto.request.DeviceCommandRequest;
 import com.example.backend.mqtt.entity.Device;
 import com.example.backend.mqtt.service.DeviceManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -40,5 +42,11 @@ public class DeviceManagementController {
         
         deviceManagementService.toggleDeviceBlock(authentication.getName(), deviceId, block);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/add")
+    public ResponseEntity<Device> addDevice(@Valid @RequestBody AddDeviceRequest request) {
+        Device createdDevice = deviceManagementService.addDevice(request.uuid(), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdDevice);
     }
 }

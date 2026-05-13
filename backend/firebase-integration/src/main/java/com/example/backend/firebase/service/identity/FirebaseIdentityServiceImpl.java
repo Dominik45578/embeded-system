@@ -25,7 +25,7 @@ public class FirebaseIdentityServiceImpl implements FirebaseIdentityService {
         try {
             return  firebaseTokenMapper.toDto(firebaseAuth.verifyIdToken(token));
         } catch (FirebaseAuthException e) {
-            log.debug("Invalid firebase token");
+            log.warn("Invalid firebase token {}", e.getMessage());
             throw new InvalidTokenException();
         }
     }
@@ -35,6 +35,7 @@ public class FirebaseIdentityServiceImpl implements FirebaseIdentityService {
         try {
             return firebaseUserMapper.toDto(firebaseAuth.getUser(uuid));
         } catch (FirebaseAuthException e) {
+            log.warn("Invalid firebase user {}", e.getMessage());
             throw new InvalidUserException();
         }
     }
