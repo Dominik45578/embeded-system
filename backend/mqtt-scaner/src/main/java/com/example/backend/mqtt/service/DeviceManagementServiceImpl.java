@@ -1,5 +1,6 @@
 package com.example.backend.mqtt.service;
 
+import com.example.backend.mqtt.dto.request.AddDeviceRequest;
 import com.example.backend.mqtt.dto.request.DeviceCommandRequest;
 import com.example.backend.mqtt.dto.response.LockCommandResponse;
 import com.example.backend.mqtt.entity.Device;
@@ -58,5 +59,45 @@ public class DeviceManagementServiceImpl implements DeviceManagementService {
             throw new AccessDeniedException("Nie masz uprawnień do tego urządzenia.");
         }
         return device;
+    }
+
+    @Override
+    @Transactional
+    public Device addDevice(String firebaseId, AddDeviceRequest request) {
+        User user = userRepository.findById(firebaseId)
+                .orElseThrow(() -> new IllegalArgumentException("Użytkownik o podanym ID nie istnieje."));
+
+        return deviceRepository.findByDeviceId(request.deviceId())
+                .map(existingDevice -> {
+                    if (existingDevice.getUser() != null) {
+                        if (existingDevice.getUser().getFirebaseId().equals(firebaseId)) {
+                            if (request.deviceName() != null && !request.deviceName().isBlank()) {
+                                existingDevice.setDeviceName(request.deviceName());
+                            }
+                            return deviceRepository.save(existingDevice);
+                        } else {
+                            throw new IllegalStateException("Urządzenie o tym identyfikatorze jest już przypisane do innego użytkownika.");
+                        }
+                    }
+                    existingDevice.setUser(user);
+                    if (request.deviceName() != null && !request.deviceName().isBlank()) {
+                        existingDevice.setDeviceName(request.deviceName());
+                    }
+                    return deviceRepository.save(existingDevice);
+                })
+                .orElseGet(() -> {
+                    String name = (request.deviceName() != null && !request.deviceName().isBlank())
+                            ? request.deviceName()
+                            : "default_device"; // Zachowanie zgodne z defaultem w encji
+
+                    Device newDevice = Device.builder()
+                            .deviceId(request.deviceId())
+                            .deviceName(name)
+                            .blocked(false)
+                            .user(user)
+                            .build();
+
+                    return deviceRepository.save(newDevice);
+                });
     }
 }

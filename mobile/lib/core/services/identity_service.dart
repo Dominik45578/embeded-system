@@ -28,7 +28,7 @@ class IdentityService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiClient.getIdentity('/user/$uuid');
+      final response = await _apiClient.getIdentity('user/$uuid');
       if (response.statusCode == 200) {
         final Map<String, dynamic> decoded = jsonDecode(response.body);
         _currentUserRecord = UserRecordDto.fromJson(decoded);
@@ -38,6 +38,9 @@ class IdentityService extends ChangeNotifier {
       }
     } catch (e) {
       _errorMessage = e.toString();
+      if (kDebugMode) {
+        print(_errorMessage);
+      }
     } //
     finally {
       _isLoading = false;
@@ -52,7 +55,7 @@ class IdentityService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiClient.postIdentity('auth/', {'idToken': idToken});
+      final response = await _apiClient.postIdentity('user/auth', {'idToken': idToken});
       if (response.statusCode == 200) {
         final Map<String, dynamic> decoded = jsonDecode(response.body);
         _currentAuthToken = AuthTokenDto.fromJson(decoded);
@@ -62,6 +65,9 @@ class IdentityService extends ChangeNotifier {
       }
     } catch (e) {
       _errorMessage = e.toString();
+      if (kDebugMode) {
+        print(_errorMessage);
+      }
     } finally {
       _isLoading = false;
       notifyListeners();

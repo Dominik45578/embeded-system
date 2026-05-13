@@ -13,7 +13,7 @@ class ConnectionConfig {
     required this.iotPort,
   });
 
-  String get identityBaseUrl => '${protocol.name}://$host:$identityPort/user/';
+  String get identityBaseUrl => '${protocol.name}://$host:$identityPort/';
   String get iotBaseUrl => '${protocol.name}://$host:$iotPort/api/v1';
 
   ConnectionConfig copyWith({

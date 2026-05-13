@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/services/identity_service.dart';
@@ -15,6 +16,7 @@ class ProfileTab extends StatefulWidget {
 
 class _ProfileTabState extends State<ProfileTab> {
   final IdentityService _identityService = IdentityService.instance;
+  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
 
   @override
   void initState() {
@@ -23,8 +25,22 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   Future<void> _loadProfileData() async {
-    // Przykładowe wywołanie z zalogowanym ID użytkownika (np. pobranym z Firebase Auth)
-    await _identityService.fetchIdentity('current-user-uuid');
+    try {
+      final String? idToken = await _firebaseAuth.currentUser?.getIdToken();
+
+      if (idToken == null) {
+        debugPrint("Użytkownik nie jest zalogowany w Firebase Auth.");
+        return;
+      }
+
+      final authToken = await _identityService.verifyToken(idToken);
+
+      if (authToken != null && authToken.uid.isNotEmpty) {
+        await _identityService.fetchIdentity(authToken.uid);
+      }
+    } catch (e) {
+      debugPrint("Wystąpił błąd podczas ładowania danych profilu: $e");
+    }
   }
 
   @override

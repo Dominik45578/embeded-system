@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:lockly_app/ui/screens/tabs/device_tab.dart';
+import 'package:lockly_app/ui/screens/tabs/event_tab.dart';
 import 'package:lockly_app/ui/screens/tabs/profile_tab.dart';
 
 
@@ -13,8 +15,8 @@ class _RootLayoutState extends State<RootLayout> {
   int _currentIndex = 0;
 
   final List<Widget> _tabs = const [
-    // DevicesTab(),
-    // EventsTab(),
+    DevicesTab(),
+    EventsTab(),
     ProfileTab(),
   ];
 
