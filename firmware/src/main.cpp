@@ -4,10 +4,11 @@
 #include "KeypadLockController.hpp"
 #include "BleAppController.hpp"
 #include "BleLockController.hpp"
+#include "BleConnectionController.hpp"
+#include "AppIdentity.hpp"
 #include "MqttManager.hpp"
 #include "LockController.hpp"
 
-const char* DEVICE_ID = "DzWord=CWord";
 const char* GLOBAL_TOPIC = "topicCinkus";
 
 LedcSerwoManager servo;
@@ -15,6 +16,7 @@ MqttManager* mqtt_manager;
 KeypadLockController* keypad_controller;
 BleAppController* ble_app_controller;
 BleLockController* ble_lock_controller;
+BleConnectionController* ble_connection_controller;
 
 LockSystemState lastSystemState = LockSystemState::IDLE_LOCKED;
 
@@ -69,11 +71,17 @@ void setup() {
 
     keypad_controller = new KeypadLockController(keypad);
 
-    mqtt_manager = new MqttManager(GLOBAL_TOPIC, DEVICE_ID);
+
+    Serial.print("DeviceId: "); Serial.println(getDeviceId());
+
+    mqtt_manager = new MqttManager(GLOBAL_TOPIC, getDeviceId());
     mqtt_manager->setupWiFi();
 
     ble_app_controller = new BleAppController();
     ble_app_controller->init();
+
+    ble_connection_controller = new BleConnectionController(getDeviceId());
+    ble_connection_controller->init();
     
     ble_lock_controller = new BleLockController();
     ble_lock_controller->init();
@@ -97,7 +105,7 @@ void loop() {
         
         String sourceStr = sourceToString(currentSource);
 
-        MqttMessage mqttMessage = MqttMessage(DEVICE_ID, stateToString(currentState), sourceStr);
+        MqttMessage mqttMessage = MqttMessage(getDeviceId(), stateToString(currentState), sourceStr);
         mqtt_manager->publish(mqttMessage);
         
         lastSystemState = currentState;
