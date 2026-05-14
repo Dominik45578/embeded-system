@@ -4,8 +4,6 @@ services:
   mqtt-broker:
     env_file:
       - .env.app
-    profiles:
-      - app
     image: eclipse-mosquitto:${MOSQUITTO_VERSION}
     container_name: iot_mqtt_broker
     ports:
@@ -58,9 +56,6 @@ services:
     profiles:
       - app
     image: kowalolo/mqtt-scaner:1.0
-    build:
-      context: ./backend/mqtt-scaner
-      dockerfile: Dockerfile
     container_name: iot_mqtt_scaner
     ports:
       - "12200:12200"
@@ -96,9 +91,6 @@ services:
     ports:
       - "12100:12100"
     image: kowalolo/firebase-integration:1.0
-    build:
-      context: ./backend/firebase-integration
-      dockerfile: Dockerfile
     container_name: iot_firebase_integration
     restart: unless-stopped
     environment:
