@@ -1,4 +1,4 @@
-package com.example.backend.mqtt.config;
+package com.example.backend.mqtt.config.influx;
 
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.InfluxDBClientFactory;

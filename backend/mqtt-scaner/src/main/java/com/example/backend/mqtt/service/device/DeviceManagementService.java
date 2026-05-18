@@ -1,4 +1,4 @@
-package com.example.backend.mqtt.service;
+package com.example.backend.mqtt.service.device;
 
 import com.example.backend.mqtt.dto.request.AddDeviceRequest;
 import com.example.backend.mqtt.dto.request.DeviceCommandRequest;

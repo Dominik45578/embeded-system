@@ -1,4 +1,4 @@
-package com.example.backend.mqtt.config;
+package com.example.backend.mqtt.config.influx;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;

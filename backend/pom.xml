@@ -155,12 +155,12 @@
             </dependency>
             <!-- MQTT -->
 
-            <dependency>
-                <groupId>org.eclipse.paho</groupId>
-                <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
-                <version>${mqtt.version}</version>
-            </dependency>
 
+            <dependency>
+                <groupId>com.kowallo.spring</groupId>
+                <artifactId>mqtt-web-starter</artifactId>
+                <version>1.1.1</version>
+            </dependency>
             <!-- INFLUX -->
 
             <dependency>

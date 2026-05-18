@@ -27,7 +27,7 @@ BACKEND_ISSUER_URI=https://your-auth-domain/realms/lockly
 BACKEND_JWK_SET_URI=https://your-auth-domain/realms/lockly/protocol/openid-connect/certs
 
 BACKEND_MQTT_HOST=tcp://mqtt-broker:1883
-BACKEND_MQTT_TOPIC=lockly/events
+BACKEND_MQTT_TOPIC=#
 
 BACKEND_INFLUX_HOST=http://influxdb:8086
 BACKEND_INFLUX_TOKEN=super-secret-token

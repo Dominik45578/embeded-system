@@ -1,4 +1,4 @@
-package com.example.backend.mqtt.service;
+package com.example.backend.mqtt.service.device;
 
 import com.example.backend.mqtt.dto.request.AddDeviceRequest;
 import com.example.backend.mqtt.dto.request.DeviceCommandRequest;
@@ -21,7 +21,7 @@ public class DeviceManagementServiceImpl implements DeviceManagementService {
 
     private final DeviceRepository deviceRepository;
     private final UserRepository userRepository;
-    private final MQTTPublisher mqttPublisher;
+    private final DeviceCommandMqttPublisher deviceCommandMqttPublisher;
 
     @Override
     public List<Device> getUserDevices(String firebaseId) {
@@ -29,7 +29,6 @@ public class DeviceManagementServiceImpl implements DeviceManagementService {
                 .map(User::getDevices)
                 .orElse(List.of());
     }
-
     @Override
     @Transactional
     public void sendCommand(String firebaseId, DeviceCommandRequest request) {
@@ -39,8 +38,8 @@ public class DeviceManagementServiceImpl implements DeviceManagementService {
             throw new IllegalStateException("Urządzenie jest zablokowane.");
         }
 
-        LockCommandResponse response = new LockCommandResponse(Instant.now(),request.getCommand());
-        mqttPublisher.publishCommand("topic/" + device.getDeviceId(), response);
+        LockCommandResponse response = new LockCommandResponse(Instant.now(), request.getCommand());
+        deviceCommandMqttPublisher.sendCommand(device.getDeviceId(), response);
     }
 
     @Override
@@ -88,8 +87,7 @@ public class DeviceManagementServiceImpl implements DeviceManagementService {
                 .orElseGet(() -> {
                     String name = (request.deviceName() != null && !request.deviceName().isBlank())
                             ? request.deviceName()
-                            : "default_device"; // Zachowanie zgodne z defaultem w encji
-
+                            : "default_device";
                     Device newDevice = Device.builder()
                             .deviceId(request.deviceId())
                             .deviceName(name)

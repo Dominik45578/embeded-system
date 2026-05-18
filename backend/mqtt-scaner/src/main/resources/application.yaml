@@ -1,23 +1,44 @@
 spring:
+  mqtt:
+    enabled: true
+    host: ${BACKEND_MQTT_HOST:localhost}
+    port: ${BACKEND_MQTT_PORT:1883}
+    url: tcp://${spring.mqtt.host}:${spring.mqtt.port}
+    client-id: ${BACKEND_MQTT_CLIENT_ID:spring-mqtt-scanner}
+    topics:
+      - "#"
+    default-qos: ${BACKEND_MQTT_DEFAULT_QOS:1}
+
+    # username: ${BACKEND_MQTT_USERNAME}
+    # password: ${BACKEND_MQTT_PASSWORD}
+    clean-session: ${BACKEND_MQTT_CLEAN_SESSION:false}
+    connection-timeout: ${BACKEND_MQTT_CONNECTION_TIMEOUT:15}
+    keep-alive-interval: ${BACKEND_MQTT_KEEP_ALIVE_INTERVAL:30}
+    automatic-reconnect: ${BACKEND_MQTT_AUTOMATIC_RECONNECT:true}
+
   threads:
     virtual:
       enabled: true
+
   application:
     name: backend
+
   datasource:
     url: ${DATABASE_URL}
     username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
+
   jpa:
     hibernate:
       ddl-auto: validate
+
     show-sql: false
+
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-
 
   flyway:
     enabled: true
@@ -25,20 +46,18 @@ spring:
     baseline-on-migrate: true
 
   rabbitmq:
-      host: ${RABBITMQ_HOST:localhost}
-      port: ${RABBITMQ_PORT:5672}
-      username: ${RABBITMQ_USERNAME:guest}
-      password: ${RABBITMQ_PASSWORD:guest}
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
 
 backend:
-  mqtt:
-    host: ${BACKEND_MQTT_HOST}
-    topic: ${BACKEND_MQTT_TOPIC}
   influx:
     host: ${BACKEND_INFLUX_HOST}
     token: ${BACKEND_INFLUX_TOKEN}
     bucket: ${BACKEND_INFLUX_BUCKET}
     org: ${BACKEND_INFLUX_ORG}
+
 server:
   port: 12200
 

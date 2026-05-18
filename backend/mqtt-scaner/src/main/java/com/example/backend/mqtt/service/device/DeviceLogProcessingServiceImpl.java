@@ -1,74 +1,40 @@
-package com.example.backend.mqtt.service;
+package com.example.backend.mqtt.service.device;
 
 import com.example.backend.mqtt.dto.request.LockLogRequest;
 import com.example.backend.mqtt.repository.DeviceRepository;
+import com.example.backend.mqtt.service.notification.NotificationPublisher;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.WriteApiBlocking;
 import com.influxdb.client.domain.WritePrecision;
 import com.influxdb.client.write.Point;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.paho.client.mqttv3.IMqttMessageListener;
-import org.eclipse.paho.client.mqttv3.MqttMessage;
-import org.springframework.stereotype.Component;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.stereotype.Service;
 
-import java.util.Set;
-
-@Component
+@Service
 @RequiredArgsConstructor
 @Slf4j
-class MQTTSubscriber implements IMqttMessageListener {
+public class DeviceLogProcessingServiceImpl implements DeviceLogProcessingService {
 
-    private final ObjectMapper objectMapper;
-    private final InfluxDBClient influxDBClient;
-    private final Validator validator;
     private final DeviceRepository deviceRepository;
     private final NotificationPublisher notificationPublisher;
+    private final InfluxDBClient influxDBClient;
 
     @Override
-    public void messageArrived(String topic, MqttMessage mqttMessage) {
-        String rawPayload = new String(mqttMessage.getPayload());
-        log.debug("Received raw JSON from MQTT topic {}: {}", topic, rawPayload);
-
-        LockLogRequest request;
-        try {
-            request = objectMapper.readValue(rawPayload, LockLogRequest.class);
-        } catch (Exception e) {
-            log.warn("Failed to parse MQTT JSON payload: {}", e.getMessage());
-            return;
-        }
-
-        if (!isValid(request)) return;
-
+    public void processDeviceLog(LockLogRequest request) {
         deviceRepository.findByDeviceId(request.deviceId()).ifPresentOrElse(
                 device -> {
                     if (device.isBlocked()) {
                         log.warn("Device {} is blocked. Ignoring log request.", device.getDeviceId());
                         return;
                     }
+                    // Wyzwalanie powiadomień aplikacyjnych
                     notificationPublisher.notifyStateChange(device, request.lockState());
+                    // Zapis telemetryczny do bazy szeregów czasowych
                     saveToInflux(request);
                 },
                 () -> log.warn("Device {} not found in DB. Request rejected.", request.deviceId())
         );
-    }
-
-    private boolean isValid(LockLogRequest payload) {
-        Set<ConstraintViolation<LockLogRequest>> violations = validator.validate(payload);
-        if (!violations.isEmpty()) {
-            StringBuilder stringBuilder = new StringBuilder("JSON Payload is invalid: [");
-            for (ConstraintViolation<LockLogRequest> violation : violations) {
-                stringBuilder.append(violation.getPropertyPath()).append(": ")
-                        .append(violation.getMessage()).append("; ");
-            }
-            stringBuilder.append("]");
-            log.warn(stringBuilder.toString());
-            return false;
-        }
-        return true;
     }
 
     private void saveToInflux(LockLogRequest request) {

@@ -1,4 +1,4 @@
-package com.example.backend.mqtt.config;
+package com.example.backend.mqtt.config.channels;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.amqp.core.*;

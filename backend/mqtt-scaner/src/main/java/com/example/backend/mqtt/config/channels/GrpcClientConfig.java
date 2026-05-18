@@ -1,4 +1,4 @@
-package com.example.backend.mqtt.config;
+package com.example.backend.mqtt.config.channels;
 
 import com.example.backend.common.auth.AuthServiceGrpc;
 import net.devh.boot.grpc.client.inject.GrpcClient;

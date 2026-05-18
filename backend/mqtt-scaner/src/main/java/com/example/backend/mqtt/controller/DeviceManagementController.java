@@ -3,7 +3,7 @@ package com.example.backend.mqtt.controller;
 import com.example.backend.mqtt.dto.request.AddDeviceRequest;
 import com.example.backend.mqtt.dto.request.DeviceCommandRequest;
 import com.example.backend.mqtt.entity.Device;
-import com.example.backend.mqtt.service.DeviceManagementService;
+import com.example.backend.mqtt.service.device.DeviceManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

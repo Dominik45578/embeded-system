@@ -1,6 +1,6 @@
-package com.example.backend.mqtt.service;
+package com.example.backend.mqtt.service.notification;
 
-import com.example.backend.mqtt.config.RabbitMQConfig;
+import com.example.backend.mqtt.config.channels.RabbitMQConfig;
 import com.example.backend.mqtt.entity.Device;
 import com.example.backend.mqtt.model.LockState;
 import lombok.RequiredArgsConstructor;
