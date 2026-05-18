@@ -13,7 +13,7 @@ private:
     const char* password = "12345678";
     const char* mqtt_server = "broker.mqtt-dashboard.com";
     const char* global_topic;
-    const char* device_topic;
+    String device_topic;
 
     WiFiClient espClient;
     PubSubClient client;
@@ -22,7 +22,7 @@ private:
     void reconnect();
 
 public:
-    MqttManager(const char* global_topic, const char* device_topic);
+    MqttManager(const char* global_topic, const String& device_topic);
     ~MqttManager();
     void setupWiFi();
     void loop();

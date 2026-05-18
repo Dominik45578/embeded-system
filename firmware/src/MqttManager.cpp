@@ -1,7 +1,7 @@
 #include "MqttManager.hpp"
 #include "LockController.hpp"
 
-MqttManager::MqttManager(const char* global_topic, const char* device_topic) : client(espClient)
+MqttManager::MqttManager(const char* global_topic, const String& device_topic) : client(espClient)
 {
     this->global_topic = global_topic;
     this->device_topic = device_topic;
@@ -48,7 +48,7 @@ void MqttManager::reconnect() {
 
         if (client.connect(clientId.c_str())) {
             Serial.println("connected");
-            client.subscribe(device_topic);
+            client.subscribe(device_topic.c_str());
         } else {
             Serial.print("failed, rc=");
             Serial.print(client.state());
@@ -67,7 +67,7 @@ void MqttManager::callback(char* topic, byte* payload, unsigned int length) {
   }
   Serial.println();
 
-  if(strcmp(topic, device_topic) == 0){
+    if(strcmp(topic, device_topic.c_str()) == 0){
     JsonDocument doc;
     deserializeJson(doc, payload);
     
