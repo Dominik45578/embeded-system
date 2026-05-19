@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/services/iot_device_service.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/custom_card.dart';
-
+import '../../../core/services/ble/ble_device_manger.dart';
+import 'device_scanner_modal.dart';
+import 'dynamic_lock_card.dart';
 
 class DevicesTab extends StatelessWidget {
   const DevicesTab({super.key});
 
   Future<void> _handleRefresh() async {
-    await IotDeviceService.instance.fetchMyDevices();
+    final manager = BleDeviceManager();
+    for (var deviceId in manager.savedDeviceIds) {
+      if (manager.getConnection(deviceId) == null) {
+      }
+    }
   }
 
   @override
@@ -18,62 +21,46 @@ class DevicesTab extends StatelessWidget {
       onRefresh: _handleRefresh,
       color: const Color(0xFF00ADB5),
       backgroundColor: const Color(0xFF1E1E1E),
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24.0),
-        children: [
-          const Text(
-            'Panel Główny',
-            style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 24),
-          CustomCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Lockly Smart Lock',
-                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    Icon(Icons.lock_outline, color: Color(0xFF00ADB5)),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: CustomButton(
-                        text: 'Otwórz',
-                        icon: Icons.lock_open_rounded,
-                        onPressed: () {},
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: CustomButton(
-                        text: 'Zamknij',
-                        icon: Icons.lock_rounded,
-                        type: CustomButtonType.secondary,
-                        onPressed: () {},
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                CustomButton(
-                  text: 'Zmień PIN urządzenia',
-                  icon: Icons.password_rounded,
-                  type: CustomButtonType.secondary,
-                  isFullWidth: true,
-                  onPressed: () {},
-                ),
-              ],
-            ),
-          ),
-        ],
+      child: ListenableBuilder(
+        listenable: BleDeviceManager(),
+        builder: (context, child) {
+          final savedDevices = BleDeviceManager().savedDeviceIds;
+
+          return ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(24.0),
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Panel Główny',
+                    style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline, color: Color(0xFF00ADB5), size: 32),
+                    onPressed: () => DeviceScannerModal.show(context),
+                  )
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              if (savedDevices.isEmpty)
+                const Center(
+                  child: Text(
+                    'Brak dodanych urządzeń.\nKliknij + aby wyszukać.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                  ),
+                )
+              else
+                ...savedDevices.map((id) => Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: DynamicLockCard(deviceId: id),
+                )),
+            ],
+          );
+        },
       ),
     );
   }
