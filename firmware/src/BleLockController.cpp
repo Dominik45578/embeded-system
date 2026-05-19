@@ -1,4 +1,5 @@
 #include "BleLockController.hpp"
+#include "ConfigManager.hpp"
 
 BleLockController::BleLockController() {
     lastNotifiedState_ = LockSystemState::IDLE_LOCKED;
@@ -8,23 +9,20 @@ void BleLockController::init() {
     Serial.println("[BleLockController] Inicjalizacja serwisu zamka...");
 
     BleManager::getInstance().createNewService("FF20")
-        
         .addCharacteristic("FF21")
-            .encryptedWriteAccess()
+            .writeAccess()
             .onWrite([this](const std::string& data) {
                 Serial.print("Odebrano : ");
                 Serial.println(data.c_str());
                 String payload = String(data.c_str());
-                payload.trim(); // Usuwamy białe znaki
+                payload.trim();
                 this->handleCommand(payload);
             })
             .buildCharacteristic()
-
         .addCharacteristic("FF22")
-            .encryptedReadAccess()
+            .readAccess()
             .notifyAccess()
             .buildCharacteristic()
-
         .buildService();
 }
 
@@ -53,7 +51,6 @@ void BleLockController::handleCommand(const String& payload) {
         args = payload.substring(firstColon + 1);
     }
 
-
     if (cmd == "UNLOCK") {
         String pin = args;
         ActionResult res = LockController::getInstance().attemptUnlock(pin, ActionSource::BLUETOOTH);
@@ -80,6 +77,10 @@ void BleLockController::handleCommand(const String& payload) {
             ActionResult res = LockController::getInstance().changePin(oldPin, newPin, ActionSource::BLUETOOTH);
             
             if (res == ActionResult::SUCCESS) {
+                AppConfig updatedConfig = ConfigOrchestrator::getInstance().getConfig();
+                updatedConfig.set<String>("lock.pin", newPin);
+                ConfigOrchestrator::getInstance().updateConfig(updatedConfig);
+                
                 sendNotification("SUCCESS:PIN_CHANGED");
             } else {
                 sendNotification("ERROR:CHANGE_FAILED");

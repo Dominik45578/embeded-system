@@ -1,9 +1,7 @@
 spring:
   mqtt:
     enabled: true
-    host: ${BACKEND_MQTT_HOST:localhost}
-    port: ${BACKEND_MQTT_PORT:1883}
-    url: tcp://${spring.mqtt.host}:${spring.mqtt.port}
+    url: ${BACKEND_MQTT_HOST}
     client-id: ${BACKEND_MQTT_CLIENT_ID:spring-mqtt-scanner}
     topics:
       - "#"
@@ -66,3 +64,8 @@ grpc:
     firebase-auth:
       address: ${GRPC_FIREBASE_INTEG_ADRES}
       negotiation-type: plaintext
+
+logging:
+  level:
+    com.kowallo.spring: DEBUG
+    org.springframework.integration.mqtt: DEBUG

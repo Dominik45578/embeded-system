@@ -31,33 +31,27 @@ byte colPins[COLS] = {16,4,0,15};
 
 
 Keypad keypad = Keypad( makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS); 
+ConfigOrchestrator& config = ConfigOrchestrator::getInstance();
 
 
 void load() {
-    ConfigOrchestrator* config = ConfigOrchestrator::getInstance();
-    ConfigStatus status = config->begin();
+    ConfigStatus status = config.begin();
     
     switch(status) {
         case ConfigStatus::OK:
             Serial.println("Konfiguracja zaladowana poprawnie.");
             break;
         case ConfigStatus::RESTORED_BACKUP:
-            Serial.println("Odtworzono konfiguracje z pliku zapasowego.");
+            Serial.println("Odtworzono konfiguracje z backupu NVS.");
             break;
-        case ConfigStatus::RESTORED_DEFAULT:
-            Serial.println("Awaria plikow. Zaladowano ustawienia fabryczne.");
-            break;
-        case ConfigStatus::FILE_ERR:
-            Serial.println("Brak pliku. Utworzono ustawienia fabryczne.");
+        case ConfigStatus::RESTORED_FACTORY:
+            Serial.println("Zaladowano ustawienia fabryczne.");
             break;
         case ConfigStatus::PARSE_ERR:
             Serial.println("Blad parsowania JSON.");
             break;
-        case ConfigStatus::RESTORING_ERR:
-            Serial.println("Krytyczny blad zapisu podczas przywracania.");
-            break;
-        case ConfigStatus::VALIDATION_ERR:
-            Serial.println("Blad walidacji danych. Uzyto bezpiecznych wartosci.");
+        case ConfigStatus::STORAGE_ERR:
+            Serial.println("Krytyczny blad dostepu do pamieci NVS.");
             break;
     }
 }

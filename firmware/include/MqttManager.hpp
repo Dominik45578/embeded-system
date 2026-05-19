@@ -5,14 +5,13 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <model/MqttMessage.h>
+#include "ConfigManager.hpp" 
 
 class MqttManager
 {
 private:
-    const char* ssid = "cin";
-    const char* password = "12345678";
-    const char* mqtt_server = "broker.mqtt-dashboard.com";
-    const char* global_topic;
+    String mqtt_server_address; 
+    String global_topic;
     String device_topic;
 
     WiFiClient espClient;
@@ -31,5 +30,3 @@ public:
 };
 
 #endif // MQTT_MANAGER_HPP
-
-

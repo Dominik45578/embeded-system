@@ -22,6 +22,7 @@ public class DeviceLogProcessingServiceImpl implements DeviceLogProcessingServic
 
     @Override
     public void processDeviceLog(LockLogRequest request) {
+        log.info("Device log processing started");
         deviceRepository.findByDeviceId(request.deviceId()).ifPresentOrElse(
                 device -> {
                     if (device.isBlocked()) {
@@ -38,6 +39,7 @@ public class DeviceLogProcessingServiceImpl implements DeviceLogProcessingServic
     }
 
     private void saveToInflux(LockLogRequest request) {
+        log.info("Saving log request to InfluxDB");
         Point point = Point.measurement("lock_logs")
                 .addTag("deviceId", request.deviceId())
                 .addField("lockState", request.lockState().ordinal())
