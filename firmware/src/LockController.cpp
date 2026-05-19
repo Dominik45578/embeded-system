@@ -1,10 +1,10 @@
 #include "LockController.hpp"
+#include "ConfigManager.hpp"
 
 LockController::LockController() {
     lockMutex_ = xSemaphoreCreateMutex();
     currentState_ = LockSystemState::IDLE_LOCKED;
     lastSource_ = ActionSource::SYSTEM;
-    currentPin_ = "1234";
     failedAttempts_ = 0;
     stateTimerStart_ = 0;
     servo_ = nullptr;
@@ -12,6 +12,17 @@ LockController::LockController() {
 
 void LockController::init(LedcSerwoManager* servo) {
     servo_ = servo;
+    
+    auto& orchestrator = ConfigOrchestrator::getInstance();
+    currentPin_ = orchestrator.getConfig().get<String>("lock.pin", "123456");
+
+    orchestrator.subscribe("lock", [this](const AppConfig& newConfig) {
+        if (xSemaphoreTake(lockMutex_, portMAX_DELAY) == pdTRUE) {
+            currentPin_ = newConfig.get<String>("lock.pin", currentPin_);
+            xSemaphoreGive(lockMutex_);
+        }
+    });
+
     executePhysicalLock();
 }
 
@@ -19,21 +30,18 @@ void LockController::update() {
     if (xSemaphoreTake(lockMutex_, 10) == pdTRUE) {
         unsigned long elapsed = millis() - stateTimerStart_;
 
-        // 1. Zamknięcie po czasie otwarcia
         if (currentState_ == LockSystemState::UNLOCKED && elapsed >= UNLOCK_DURATION) {
             currentState_ = LockSystemState::IDLE_LOCKED;
             lastSource_ = ActionSource::SYSTEM;
             executePhysicalLock();
         }
 
-        // 2. Zdjęcie kary
         if (currentState_ == LockSystemState::BLOCKED_TEMP && elapsed >= BLOCK_DURATION) {
             failedAttempts_ = 0;
             currentState_ = LockSystemState::IDLE_LOCKED;
             lastSource_ = ActionSource::SYSTEM;
         }
 
-        // 3. Timeout interakcji (ktoś wciskał na klawiaturze i sobie poszedł)
         if ((currentState_ == LockSystemState::ENTERING_PIN || 
              currentState_ == LockSystemState::CHANGING_PIN) && elapsed >= INTERACTION_TIMEOUT) {
             currentState_ = LockSystemState::IDLE_LOCKED;
@@ -52,7 +60,7 @@ void LockController::notifyActivity(LockSystemState state, ActionSource source) 
         }
         currentState_ = state;
         lastSource_ = source;
-        stateTimerStart_ = millis(); // Resetuje timeout!
+        stateTimerStart_ = millis();
         xSemaphoreGive(lockMutex_);
     }
 }
@@ -63,7 +71,6 @@ ActionResult LockController::forceUnlock(ActionSource source){
 
 ActionResult LockController::attemptUnlock(const String& pinAttempt, ActionSource source) {
     if (xSemaphoreTake(lockMutex_, portMAX_DELAY) == pdTRUE) {
-        
         if (currentState_ == LockSystemState::BLOCKED_TEMP) {
             xSemaphoreGive(lockMutex_);
             return ActionResult::ACCESS_DENIED;
@@ -130,6 +137,11 @@ ActionResult LockController::changePin(const String& oldPin, const String& newPi
         currentState_ = LockSystemState::IDLE_LOCKED;
         lastSource_ = source;
         xSemaphoreGive(lockMutex_);
+
+        AppConfig updatedConfig = ConfigOrchestrator::getInstance().getConfig();
+        updatedConfig.set<String>("lock.pin", newPin);
+        ConfigOrchestrator::getInstance().updateConfig(updatedConfig);
+
         return ActionResult::SUCCESS;
     }
     return ActionResult::ERROR;

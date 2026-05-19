@@ -12,13 +12,12 @@ enum class ActionSource {
     SYSTEM
 };
 
-// Abstrakcyjne stany systemu (sterują diodami i blokadami)
 enum class LockSystemState {
-    IDLE_LOCKED,       // Zamek zamknięty (Diody wyłączone)
-    ENTERING_PIN,      // Interakcja: Ktoś podaje PIN (Niebieski LED)
-    CHANGING_PIN,      // Interakcja: Tryb zmiany PIN (Niebieski LED)
-    UNLOCKED,          // Zamek otwarty (Zielony LED)
-    BLOCKED_TEMP       // Zablokowany za karę (Czerwony LED)
+    IDLE_LOCKED,
+    ENTERING_PIN,
+    CHANGING_PIN,
+    UNLOCKED,
+    BLOCKED_TEMP
 };
 
 enum class ActionResult {
@@ -39,26 +38,14 @@ public:
     LockController& operator=(const LockController&) = delete;
 
     void init(LedcSerwoManager* servo);
-
     void update(); 
-
     
-    // Natychmiastowa próba autoryzacji (z gotowym kodem)
     ActionResult attemptUnlock(const String& pinAttempt, ActionSource source);
-
-    // Wymuszenie otwarcia (np. przez Flutter / Backend)
     ActionResult forceUnlock(ActionSource source);
-    
-    // Bezpieczna zmiana PIN-u z weryfikacją starego
     ActionResult changePin(const String& oldPin, const String& newPin, ActionSource source);
-    
-    // Ręczne zablokowanie zamka
     ActionResult attemptLock(ActionSource source);
-
-    // Flaga dla urządzeń peryferyjnych: "Hej, zacząłem coś robić, zmień stan i resetuj timeout!"
     void notifyActivity(LockSystemState state, ActionSource source);
 
-    // --- GETTERY ---
     LockSystemState getCurrentState();
     ActionSource getLastActionSource();
     unsigned long getBlockedTimeRemaining();
@@ -73,14 +60,13 @@ private:
     ActionSource lastSource_;
     String currentPin_;
 
-    // Zmienne czasowe i kary
     int failedAttempts_;
     const int MAX_FAILED_ATTEMPTS = 3;
     unsigned long stateTimerStart_;
     
-    const unsigned long UNLOCK_DURATION = 10000;    // 10s otwarcia
-    const unsigned long BLOCK_DURATION = 30000;     // 30s kary
-    const unsigned long INTERACTION_TIMEOUT = 10000; // 10s na bezczynność (np. wpisywanie PINu i odejście)
+    const unsigned long UNLOCK_DURATION = 10000;
+    const unsigned long BLOCK_DURATION = 30000;
+    const unsigned long INTERACTION_TIMEOUT = 10000;
 
     void executePhysicalUnlock();
     void executePhysicalLock();

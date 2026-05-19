@@ -1,50 +1,28 @@
 #pragma once
+
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <LittleFS.h>
+#include <Preferences.h>
 #include <vector>
+#include <map>
+#include <functional>
 
 enum class ConfigStatus {
     OK,
-    FILE_ERR,
+    STORAGE_ERR,
     PARSE_ERR,
-    WRITE_ERR,
     RESTORED_BACKUP,
-    RESTORED_DEFAULT,
-    RESTORING_ERR,
-    VALIDATION_ERR
+    RESTORED_FACTORY
 };
 
-// struct AudioProfile {
-//     uint32_t freq;
-//     uint32_t step;
-//     uint32_t cycle_count;
-// };
-
-// struct BleConfig {
-//     String service_uuid;
-//     String char_uuid;
-//     uint32_t pin;
-// };
-
-struct AppSerialConfig {
-    bool read_enabled;
-    bool write_enabled;
-};
-
-struct AppConfig {
+class AppConfig {
 private:
     JsonDocument _doc;
 
-    static bool isSeparator(char c);
-    static bool isDigitToken(const String& token);
-    static String sha256Hex(const String& input);
-
-    std::vector<String> splitPath(const String& path) const;
-    bool getVariantByPath(JsonVariantConst root, const String& path, JsonVariantConst& out) const;
-    bool ensureParentObject(const std::vector<String>& tokens, JsonObject& parent, String& leaf) ;
-    bool validateDocument(const JsonDocument& doc) const;
-    static void mergeObjects(JsonObject dst, JsonObjectConst src);
+    std::vector<String> splitPathByDot(const String& path) const;
+    bool getVariantByPath(const String& path, JsonVariantConst& out) const;
+    bool ensureParentObject(const String& path, JsonObject& parent, String& leaf);
+    void mergeObjects(JsonObject dst, JsonObjectConst src);
 
 public:
     AppConfig();
@@ -52,66 +30,64 @@ public:
     void loadFactoryDefaults();
     ConfigStatus deserialize(const String& jsonPayload);
     String serialize() const;
-
-    bool validate() const;
+    
     bool operator==(const AppConfig& other) const;
-    String hash() const;
 
-    bool clear();
-    const JsonDocument& raw() const;
+    // Szablonowy dostęp do danych o wysokiej elastyczności (np. config.get<int>("servo.pin"))
+    template <typename T>
+    T get(const String& path, T defaultValue = T()) const {
+        JsonVariantConst node;
+        if (getVariantByPath(path, node) && node.is<T>()) {
+            return node.as<T>();
+        }
+        return defaultValue;
+    }
 
-    bool exists(const String& path) const;
-    bool removeValue(const String& path);
+    // Szablonowy zapis danych, automatycznie tworzący brakujące gałęzie drzewa
+    template <typename T>
+    bool set(const String& path, const T& value) {
+        JsonObject parent;
+        String leaf;
+        if (!ensureParentObject(path, parent, leaf)) return false;
+        parent[leaf] = value;
+        return true;
+    }
 
-    bool getValue(const String& path, String& out) const;
-    bool getValue(const String& path, bool& out) const;
-    bool getValue(const String& path, uint32_t& out) const;
-    bool getValue(const String& path, int32_t& out) const;
-    bool getValue(const String& path, double& out) const;
-
-    bool setValue(const String& path, const String& value);
-    bool setValue(const String& path, const char* value);
-    bool setValue(const String& path, bool value);
-    bool setValue(const String& path, uint32_t value);
-    bool setValue(const String& path, int32_t value);
-    bool setValue(const String& path, double value);
-    bool setRawJson(const String& path, const String& jsonValue);
-
-    bool getSubtreeJson(const String& path, String& out) const;
-};
-
-class BackupManager {
-public:
-    ConfigStatus readRaw(const String& path, String& outputBuffer);
-    ConfigStatus writeAtomic(const String& path, const String& payload);
+    bool has(const String& path) const;
+    String getSubtree(const String& rootNode) const;
 };
 
 class ConfigOrchestrator {
-private:
-    AppConfig _state;
-    BackupManager _ioManager;
-
-    const String _mainPath;
-    const String _backupPath;
-
-    String _mainSnapshot;
-    String _backupSnapshot;
-
-    ConfigOrchestrator();
-    ConfigStatus processLoadLogic();
-    static ConfigOrchestrator* _instance;
-
 public:
-    static ConfigOrchestrator* getInstance();
+    using ConfigCallback = std::function<void(const AppConfig&)>;
+
+    static ConfigOrchestrator& getInstance() {
+        static ConfigOrchestrator instance;
+        return instance;
+    }
+
+    ConfigOrchestrator(const ConfigOrchestrator&) = delete;
+    ConfigOrchestrator& operator=(const ConfigOrchestrator&) = delete;
 
     ConfigStatus begin();
-    ConfigStatus reload();
-    ConfigStatus save(bool updateBackup = true);
-    ConfigStatus proccesFactoryReset();
+    ConfigStatus save();
+    ConfigStatus factoryReset();
 
     const AppConfig& getConfig() const;
     ConfigStatus updateConfig(const AppConfig& newConfig);
 
-    const String& getMainSnapshot() const;
-    const String& getBackupSnapshot() const;
+    void subscribe(const String& section, ConfigCallback callback);
+
+private:
+    ConfigOrchestrator();
+    void notify(const String& section);
+
+    AppConfig _state;
+    Preferences _prefs;
+
+    std::map<String, std::vector<ConfigCallback>> _listeners;
+
+    const char* _nvsNamespace = "sys_config";
+    const char* _mainKey = "cfg_main";
+    const char* _backupKey = "cfg_bak";
 };

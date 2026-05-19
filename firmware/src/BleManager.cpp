@@ -80,9 +80,6 @@ void BleManager::init(const std::string& deviceName) {
     
     adapter_->setPairingMode(BleDomain::FeatureState::ENABLE);
     adapter_->setBonding(BleDomain::FeatureState::ENABLE);
-    
-    adapter_->setMitmProtection(BleDomain::FeatureState::DISABLE);
-    adapter_->setSecureConnections(BleDomain::FeatureState::ENABLE);
 }
 
 ServiceBuilder BleManager::createNewService(const std::string& uuid) {

@@ -3,10 +3,16 @@
 
 MqttManager::MqttManager(const char* global_topic, const String& device_topic) : client(espClient)
 {
-    this->global_topic = global_topic;
+    this->global_topic = String(global_topic);
     this->device_topic = device_topic;
 
-    client.setServer(mqtt_server, 1883);
+    auto& config = ConfigOrchestrator::getInstance().getConfig();
+    
+    this->mqtt_server_address = config.get<String>("mqtt.server", "broker.mqtt-dashboard.com");
+    uint32_t port = config.get<uint32_t>("mqtt.port", 1883);
+
+    client.setServer(this->mqtt_server_address.c_str(), port);
+    
     client.setCallback([this](char* topic, byte* payload, unsigned int length) {
         this->callback(topic, payload, length);
     });
@@ -17,17 +23,22 @@ MqttManager::~MqttManager()
 }
 
 void MqttManager::setupWiFi() {
+    auto& config = ConfigOrchestrator::getInstance().getConfig();
+    String ssid = config.get<String>("wifi.ssid", "");
+    String password = config.get<String>("wifi.password", "");
+
     Serial.print("Connecting to ");
     Serial.println(ssid);
 
     WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid, password);
+    WiFi.begin(ssid.c_str(), password.c_str());
 
     int i = 0;
-    while ( WiFi.status() != WL_CONNECTED) {
+    while (WiFi.status() != WL_CONNECTED) {
         delay(100);
         Serial.print(".");
-        if(i = 10){
+    
+        if(i == 50){ 
             Serial.println("Wifi setup error");
             return;
         }
@@ -67,13 +78,13 @@ void MqttManager::callback(char* topic, byte* payload, unsigned int length) {
   }
   Serial.println();
 
-    if(strcmp(topic, device_topic.c_str()) == 0){
-    JsonDocument doc;
-    deserializeJson(doc, payload);
+  if(strcmp(topic, device_topic.c_str()) == 0){
+    JsonDocument incomingDoc;
+    deserializeJson(incomingDoc, payload);
     
-    const char* action = doc["command"];
+    const char* action = incomingDoc["command"];
 
-    if(strcmp(action, "UNLOCK") == 0){
+    if(action != nullptr && strcmp(action, "UNLOCK") == 0){
         Serial.println("Otrzymano prosbe o zdalne otwarcie zamkna (WiFi)");
         ActionResult res = LockController::getInstance().forceUnlock(ActionSource::WIFI);
 
@@ -86,7 +97,6 @@ void MqttManager::callback(char* topic, byte* payload, unsigned int length) {
         }
     }
   }
-
 }
 
 void MqttManager::loop() {
@@ -111,6 +121,8 @@ void MqttManager::publish(const MqttMessage message) {
         reconnect();
     }
 
+
+    doc.clear();
     doc["deviceId"] = message.getDeviceId();
     doc["lockState"] = message.getLockState();
     doc["source"] = message.getSource();
@@ -119,7 +131,7 @@ void MqttManager::publish(const MqttMessage message) {
     String outputJson = "";
     serializeJson(doc, outputJson);
 
-    boolean success = client.publish(global_topic, outputJson.c_str());
+    boolean success = client.publish(global_topic.c_str(), outputJson.c_str());
     Serial.println("Sent?:");
     Serial.println(success);
 }
