@@ -34,12 +34,16 @@ dependencies:
   firebase_auth: ^5.0.0      # Do logowania (OpenID)
   firebase_messaging: ^15.0.0 # Do powiadomień Push
   google_sign_in: ^6.2.1
+  dio: ^5.5.0+1
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   shared_preferences: ^2.5.5
   flutter_blue_plus: ^2.3.2
+  sqflite: ^2.4.2+1
+  path: ^1.9.1
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:

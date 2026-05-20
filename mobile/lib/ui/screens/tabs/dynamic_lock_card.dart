@@ -1,62 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
+import '../../../core/model/device.dart';
 import '../../../core/model/lock_command.dart';
 import '../../../core/services/ble/ble_device_manger.dart';
 import '../../../core/services/ble/ble_lock_connection.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_card.dart';
+import 'device_settings_sheet.dart';
 
-class DynamicLockCard extends StatelessWidget {
-  final String deviceId;
-  const DynamicLockCard({super.key, required this.deviceId});
+class DynamicLockCard extends StatefulWidget {
+  final Device device;
 
-  void _showInfoPanel(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Informacje o urządzeniu', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('MAC / ID: $deviceId', style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 16),
-            const Text('Konfiguracja Wi-Fi (wkrótce)', style: TextStyle(color: Colors.white70)),
-            const Text('Adres brokera MQTT (wkrótce)', style: TextStyle(color: Colors.white70)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Zamknij', style: TextStyle(color: Color(0xFF00ADB5))),
-          ),
-        ],
-      ),
-    );
+  const DynamicLockCard({super.key, required this.device});
+
+  @override
+  State<DynamicLockCard> createState() => _DynamicLockCardState();
+}
+
+class _DynamicLockCardState extends State<DynamicLockCard> {
+  final BleDeviceManager _bleManager = BleDeviceManager();
+  bool _isConnecting = false;
+
+  Future<void> _connectToDevice() async {
+    if (_isConnecting) return;
+    setState(() => _isConnecting = true);
+
+    try {
+      final bleDevice = BluetoothDevice.fromId(widget.device.id);
+      await _bleManager.connectToDevice(bleDevice);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Błąd połączenia: ${e.toString()}'), backgroundColor: Colors.redAccent),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isConnecting = false);
+      }
+    }
   }
 
   Future<void> _handleUnlock(BuildContext context, BleLockConnection connection) async {
-    final pin = await _showInputDialog(context, 'Wprowadź PIN', 'PIN', false);
+    final pin = await _showInputDialog(context, 'Wprowadź PIN', 'PIN');
     if (pin != null && pin.isNotEmpty) {
-      // Budowa komendy UNLOCK:<pin> zgodnie z logiką firmware
       await connection.sendCommand(LockCommand(LockCommandType.unlock, [pin]));
     }
   }
 
   Future<void> _handleChangePin(BuildContext context, BleLockConnection connection) async {
-    final oldPin = await _showInputDialog(context, 'Podaj obecny PIN', 'Stary PIN', false);
+    final oldPin = await _showInputDialog(context, 'Podaj obecny PIN', 'Stary PIN');
     if (oldPin == null || oldPin.isEmpty) return;
 
-    final newPin = await _showInputDialog(context, 'Podaj nowy PIN', 'Nowy PIN', false);
+    final newPin = await _showInputDialog(context, 'Podaj nowy PIN', 'Nowy PIN');
     if (newPin != null && newPin.isNotEmpty) {
-      // Budowa komendy CHANGE:<old_pin>:<new_pin>
       await connection.sendCommand(LockCommand(LockCommandType.changePin, [oldPin, newPin]));
     }
   }
 
-  Future<String?> _showInputDialog(BuildContext context, String title, String hint, bool isPassword) {
+  Future<String?> _showInputDialog(BuildContext context, String title, String hint) {
     final controller = TextEditingController();
     return showDialog<String>(
       context: context,
@@ -66,19 +69,12 @@ class DynamicLockCard extends StatelessWidget {
         content: TextField(
           controller: controller,
           style: const TextStyle(color: Colors.white),
-          obscureText: isPassword,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(hintText: hint, hintStyle: const TextStyle(color: Colors.grey)),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Anuluj', style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Zatwierdź', style: TextStyle(color: Color(0xFF00ADB5))),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Anuluj', style: TextStyle(color: Colors.grey))),
+          TextButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('Zatwierdź', style: TextStyle(color: Color(0xFF00ADB5)))),
         ],
       ),
     );
@@ -86,81 +82,150 @@ class DynamicLockCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final manager = BleDeviceManager();
-    final connection = manager.getConnection(deviceId);
+    return ListenableBuilder(
+      listenable: _bleManager,
+      builder: (context, child) {
+        final connection = _bleManager.getConnection(widget.device.id);
+        final isConnected = _bleManager.isConnected(widget.device.id);
 
-    return CustomCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return CustomCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Lockly Smart Lock', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.device.name.isNotEmpty ? widget.device.name : 'Zamek bez nazwy',
+                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Icon(Icons.bluetooth, color: isConnected ? const Color(0xFF00ADB5) : Colors.grey),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.settings, color: Colors.grey),
+                        onPressed: () => DeviceSettingsSheet.show(context, widget.device),
+                      ),
+                    ],
+                  )
+                ],
+              ),
+
+              if (!isConnected)
+                _buildConnectionControls()
+              else if (connection != null)
+                _buildStatusStream(connection)
+              else
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: Text('Status: Inicjalizacja...', style: TextStyle(color: Colors.amber)),
+                ),
+
+              const SizedBox(height: 16),
               Row(
                 children: [
-                  StreamBuilder<BluetoothConnectionState>(
-                    stream: connection?.connectionStateStream,
-                    initialData: BluetoothConnectionState.disconnected,
-                    builder: (context, snapshot) {
-                      final isConnected = snapshot.data == BluetoothConnectionState.connected;
-                      return Icon(
-                        isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
-                        color: isConnected ? const Color(0xFF00ADB5) : Colors.red,
-                      );
-                    },
+                  Expanded(
+                    child: CustomButton(
+                      text: 'Otwórz',
+                      icon: Icons.lock_open_rounded,
+                      onPressed: () {
+                        if (isConnected && connection != null) {
+                          _handleUnlock(context, connection);
+                        }
+                      },
+                    ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.settings, color: Colors.grey),
-                    onPressed: () => _showInfoPanel(context),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: CustomButton(
+                      text: 'Zamknij',
+                      icon: Icons.lock_rounded,
+                      type: CustomButtonType.secondary,
+                      onPressed: () {
+                        if (isConnected && connection != null) {
+                          connection.sendCommand(LockCommand(LockCommandType.lock));
+                        }
+                      },
+                    ),
                   ),
                 ],
-              )
+              ),
+              const SizedBox(height: 12),
+              CustomButton(
+                text: 'Zmień PIN',
+                icon: Icons.password_rounded,
+                type: CustomButtonType.secondary,
+                isFullWidth: true,
+                onPressed: () {
+                  if (isConnected && connection != null) {
+                    _handleChangePin(context, connection);
+                  }
+                },
+              ),
             ],
           ),
-          
-          if (connection != null)
-            StreamBuilder<String>(
-              stream: connection.lockStateStream,
-              initialData: 'Pobieranie statusu...',
-              builder: (context, snapshot) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Text('Status: ${snapshot.data}', style: const TextStyle(color: Colors.amber)),
-              ),
+        );
+      },
+    );
+  }
+
+  Widget _buildConnectionControls() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('Rozłączony', style: TextStyle(color: Colors.white.withOpacity(0.6))),
+          if (_isConnecting)
+            const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00ADB5)))
+          else
+            TextButton(
+              onPressed: _connectToDevice,
+              child: const Text('Połącz', style: TextStyle(color: Color(0xFF00ADB5), fontWeight: FontWeight.bold)),
             ),
-            
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: CustomButton(
-                  text: 'Otwórz',
-                  icon: Icons.lock_open_rounded,
-                  onPressed: connection == null ? () {} : () => _handleUnlock(context, connection),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: CustomButton(
-                  text: 'Zamknij',
-                  icon: Icons.lock_rounded,
-                  type: CustomButtonType.secondary,
-                  // Komenda LOCK nie wymaga argumentów w firmware
-                  onPressed: connection == null ? () {} : () => connection.sendCommand(LockCommand(LockCommandType.lock)),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          CustomButton(
-            text: 'Zmień PIN urządzenia',
-            icon: Icons.password_rounded,
-            type: CustomButtonType.secondary,
-            isFullWidth: true,
-            onPressed: connection == null ? () {} : () => _handleChangePin(context, connection),
-          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildStatusStream(BleLockConnection connection) {
+    return StreamBuilder<String>(
+      stream: connection.lockStateStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8.0),
+            child: Text('Status: Połączono, oczekiwanie na dane...', style: TextStyle(color: Colors.amber)),
+          );
+        }
+
+        String displayStatus = snapshot.data ?? 'Brak danych';
+        Color statusColor = Colors.grey;
+
+        if (snapshot.hasData) {
+          if (displayStatus.contains('UNLOCKED')) {
+            displayStatus = 'Zamek otwarty';
+            statusColor = Colors.green;
+          } else if (displayStatus.contains('LOCKED')) {
+            displayStatus = 'Zamek zamknięty';
+            statusColor = Colors.red;
+          } else if (displayStatus.contains('PIN_CHANGED')) {
+            displayStatus = 'Zmieniono PIN';
+            statusColor = Colors.orange;
+          } else {
+            statusColor = Colors.amber;
+          }
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Text('Status: $displayStatus', style: TextStyle(color: statusColor)),
+        );
+      },
     );
   }
 }
