@@ -25,6 +25,10 @@ static const char FACTORY_DEFAULT_JSON[] = R"json(
     "blocked_ms": 30000,
     "auto_relock_ms": 5000
   },
+  "mqtt": {
+    "broker": "",
+    "topic": "lock/default"
+  },
   "log": {
     "enabled": true,
     "level": "INFO"

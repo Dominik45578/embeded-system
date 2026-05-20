@@ -1,12 +1,26 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/connection_config_service.dart';
 
 class ApiClient {
-  ApiClient._internal();
+  ApiClient._internal() {
+    _dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+        // Dio domyślnie podąża za przekierowaniami, co rozwiąże problem z Cloudflare Tunnel
+        followRedirects: true,
+        maxRedirects: 5,
+        // Zapobiega rzucaniu wyjątków DioException dla statusów innych niż 2xx, 
+        // aby logika obsługi błędów w serwisach pozostała niezmieniona
+        validateStatus: (status) => true,
+      ),
+    );
+  }
+  
   static final ApiClient instance = ApiClient._internal();
 
+  late final Dio _dio;
   final ConnectionConfigService _configService = ConnectionConfigService.instance;
 
   String get identityApi => _configService.config.identityBaseUrl;
@@ -23,33 +37,37 @@ class ApiClient {
     };
   }
 
-  Future<http.Response> getIdentity(String endpoint) async {
-    final url = Uri.parse('$identityApi$endpoint');
+  // --- IDENTITY API ---
+
+  Future<Response> getIdentity(String endpoint) async {
+    final url = '$identityApi$endpoint';
     final headers = await _getHeaders();
-    return await http.get(url, headers: headers);
+    return await _dio.get(url, options: Options(headers: headers));
   }
 
-  Future<http.Response> postIdentity(String endpoint, Map<String, dynamic> body) async {
-    final url = Uri.parse('$identityApi$endpoint');
+  Future<Response> postIdentity(String endpoint, Map<String, dynamic> body) async {
+    final url = '$identityApi$endpoint';
     final headers = await _getHeaders();
-    return await http.post(url, headers: headers, body: jsonEncode(body));
+    return await _dio.post(url, data: body, options: Options(headers: headers));
   }
 
-  Future<http.Response> getIot(String endpoint) async {
-    final url = Uri.parse('$iotApi$endpoint');
+  // --- IOT API ---
+
+  Future<Response> getIot(String endpoint) async {
+    final url = '$iotApi$endpoint';
     final headers = await _getHeaders();
-    return await http.get(url, headers: headers);
+    return await _dio.get(url, options: Options(headers: headers));
   }
 
-  Future<http.Response> postIot(String endpoint, Map<String, dynamic> body) async {
-    final url = Uri.parse('$iotApi$endpoint');
+  Future<Response> postIot(String endpoint, Map<String, dynamic> body) async {
+    final url = '$iotApi$endpoint';
     final headers = await _getHeaders();
-    return await http.post(url, headers: headers, body: jsonEncode(body));
+    return await _dio.post(url, data: body, options: Options(headers: headers));
   }
 
-  Future<http.Response> patchIot(String endpoint, {Map<String, dynamic>? body}) async {
-    final url = Uri.parse('$iotApi$endpoint');
+  Future<Response> patchIot(String endpoint, {Map<String, dynamic>? body}) async {
+    final url = '$iotApi$endpoint';
     final headers = await _getHeaders();
-    return await http.patch(url, headers: headers, body: body != null ? jsonEncode(body) : null);
+    return await _dio.patch(url, data: body, options: Options(headers: headers));
   }
 }

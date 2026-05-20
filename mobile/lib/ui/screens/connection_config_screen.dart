@@ -14,19 +14,33 @@ class _ConnectionConfigScreenState extends State<ConnectionConfigScreen> {
   final _formKey = GlobalKey<FormState>();
   final _configService = ConnectionConfigService.instance;
 
+  late ConnectionMode _selectedMode;
+  
+  // Kontrolery dla trybu lokalnego
   late HttpProtocol _selectedProtocol;
   late TextEditingController _hostController;
   late TextEditingController _identityPortController;
   late TextEditingController _iotPortController;
 
+  // Kontrolery dla trybu serwerowego
+  late TextEditingController _serverIdentityUrlController;
+  late TextEditingController _serverIotUrlController;
+
   @override
   void initState() {
     super.initState();
     final currentConfig = _configService.config;
+    _selectedMode = currentConfig.mode;
+    
+    // Inicjalizacja dla trybu lokalnego
     _selectedProtocol = currentConfig.protocol;
     _hostController = TextEditingController(text: currentConfig.host);
     _identityPortController = TextEditingController(text: currentConfig.identityPort.toString());
     _iotPortController = TextEditingController(text: currentConfig.iotPort.toString());
+    
+    // Inicjalizacja dla trybu serwerowego
+    _serverIdentityUrlController = TextEditingController(text: currentConfig.serverIdentityUrl);
+    _serverIotUrlController = TextEditingController(text: currentConfig.serverIotUrl);
   }
 
   @override
@@ -34,16 +48,21 @@ class _ConnectionConfigScreenState extends State<ConnectionConfigScreen> {
     _hostController.dispose();
     _identityPortController.dispose();
     _iotPortController.dispose();
+    _serverIdentityUrlController.dispose();
+    _serverIotUrlController.dispose();
     super.dispose();
   }
 
   void _saveConfiguration() {
     if (_formKey.currentState!.validate()) {
       final newConfig = ConnectionConfig(
+        mode: _selectedMode,
         protocol: _selectedProtocol,
         host: _hostController.text.trim(),
         identityPort: int.parse(_identityPortController.text.trim()),
         iotPort: int.parse(_iotPortController.text.trim()),
+        serverIdentityUrl: _serverIdentityUrlController.text.trim(),
+        serverIotUrl: _serverIotUrlController.text.trim(),
       );
 
       _configService.updateConfig(newConfig);
@@ -90,79 +109,26 @@ class _ConnectionConfigScreenState extends State<ConnectionConfigScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Parametry Połączenia',
+                    'Tryb Połączenia',
                     style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Skonfiguruj adresy sieciowe dla modułu Identity (Firebase) oraz IoT (MQTT Scanner).',
+                    'Wybierz środowisko, z którym aplikacja ma się komunikować.',
                     style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
                   ),
+                  const SizedBox(height: 16),
+                  
+                  // Przełącznik trybu (Lokalny / Serwer)
+                  _buildModeToggle(),
                   const SizedBox(height: 32),
 
-                  Theme(
-                    data: Theme.of(context).copyWith(canvasColor: const Color(0xFF1E1E1E)),
-                    child: DropdownButtonFormField<HttpProtocol>(
-                      value: _selectedProtocol,
-                      dropdownColor: const Color(0xFF1E1E1E),
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                      decoration: _buildInputDecoration('Protokół sieciowy'),
-                      items: HttpProtocol.values.map((protocol) {
-                        return DropdownMenuItem(
-                          value: protocol,
-                          child: Text(protocol.name.toUpperCase(), style: const TextStyle(color: Colors.white)),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _selectedProtocol = value);
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 20),
+                  // Dynamiczna sekcja formularza
+                  if (_selectedMode == ConnectionMode.local) 
+                    _buildLocalConfigSection()
+                  else 
+                    _buildServerConfigSection(),
 
-                  TextFormField(
-                    controller: _hostController,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                    decoration: _buildInputDecoration('Host (IP lub domena)').copyWith(
-                      hintText: 'np. 192.168.1.50 lub localhost',
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Pole host nie może być puste';
-                      }
-                      if (value.contains('://')) {
-                        return 'Wpisz sam host, bez http:// lub https://';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-
-                  TextFormField(
-                    controller: _identityPortController,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                    keyboardType: TextInputType.number,
-                    decoration: _buildInputDecoration('Port modułu Identity').copyWith(
-                      hintText: 'np. 12100',
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                    ),
-                    validator: (value) => _validatePort(value, 'Identity'),
-                  ),
-                  const SizedBox(height: 20),
-
-                  TextFormField(
-                    controller: _iotPortController,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                    keyboardType: TextInputType.number,
-                    decoration: _buildInputDecoration('Port modułu IoT').copyWith(
-                      hintText: 'np. 12200',
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                    ),
-                    validator: (value) => _validatePort(value, 'IoT'),
-                  ),
                   const SizedBox(height: 40),
 
                   CustomButton(
@@ -177,6 +143,184 @@ class _ConnectionConfigScreenState extends State<ConnectionConfigScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildModeToggle() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedMode = ConnectionMode.local),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: _selectedMode == ConnectionMode.local ? const Color(0xFF00ADB5) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Text(
+                    'Lokalnie',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedMode = ConnectionMode.server),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: _selectedMode == ConnectionMode.server ? const Color(0xFF00ADB5) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Text(
+                    'Zdalny Serwer',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLocalConfigSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Parametry Sieci Lokanej',
+          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        Theme(
+          data: Theme.of(context).copyWith(canvasColor: const Color(0xFF1E1E1E)),
+          child: DropdownButtonFormField<HttpProtocol>(
+            value: _selectedProtocol,
+            dropdownColor: const Color(0xFF1E1E1E),
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+            decoration: _buildInputDecoration('Protokół sieciowy'),
+            items: HttpProtocol.values.map((protocol) {
+              return DropdownMenuItem(
+                value: protocol,
+                child: Text(protocol.name.toUpperCase(), style: const TextStyle(color: Colors.white)),
+              );
+            }).toList(),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _selectedProtocol = value);
+              }
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+        TextFormField(
+          controller: _hostController,
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+          decoration: _buildInputDecoration('Host (IP lub domena)').copyWith(
+            hintText: 'np. 192.168.1.50 lub localhost',
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+          ),
+          validator: (value) {
+            if (_selectedMode == ConnectionMode.local) {
+               if (value == null || value.trim().isEmpty) {
+                 return 'Pole host nie może być puste';
+               }
+               if (value.contains('://')) {
+                 return 'Wpisz sam host, bez http:// lub https://';
+               }
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 20),
+        TextFormField(
+          controller: _identityPortController,
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+          keyboardType: TextInputType.number,
+          decoration: _buildInputDecoration('Port modułu Identity').copyWith(
+            hintText: 'np. 12100',
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+          ),
+          validator: (value) => _selectedMode == ConnectionMode.local ? _validatePort(value, 'Identity') : null,
+        ),
+        const SizedBox(height: 20),
+        TextFormField(
+          controller: _iotPortController,
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+          keyboardType: TextInputType.number,
+          decoration: _buildInputDecoration('Port modułu IoT').copyWith(
+            hintText: 'np. 12200',
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+          ),
+          validator: (value) => _selectedMode == ConnectionMode.local ? _validatePort(value, 'IoT') : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildServerConfigSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+         const Text(
+          'Adresy Zdalnego Serwera',
+          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _serverIdentityUrlController,
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+          keyboardType: TextInputType.url,
+          decoration: _buildInputDecoration('URL serwisu Identity').copyWith(
+            hintText: 'np. https://identity.mojadomena.pl/',
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+          ),
+          validator: (value) {
+            if (_selectedMode == ConnectionMode.server) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Adres URL nie może być pusty';
+              }
+              if (!value.startsWith('http://') && !value.startsWith('https://')) {
+                return 'Adres musi zaczynać się od http:// lub https://';
+              }
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 20),
+        TextFormField(
+          controller: _serverIotUrlController,
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+          keyboardType: TextInputType.url,
+          decoration: _buildInputDecoration('URL serwisu IoT').copyWith(
+             hintText: 'np. https://iot.mojadomena.pl/api/v1',
+             hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+          ),
+          validator: (value) {
+             if (_selectedMode == ConnectionMode.server) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Adres URL nie może być pusty';
+              }
+              if (!value.startsWith('http://') && !value.startsWith('https://')) {
+                 return 'Adres musi zaczynać się od http:// lub https://';
+              }
+            }
+            return null;
+          },
+        ),
+      ],
     );
   }
 

@@ -20,6 +20,8 @@ class _EventsTabState extends State<EventsTab> {
   void initState() {
     super.initState();
     _scrollController.addListener(_scrollListener);
+    // Automatyczne ładowanie danych przy wejściu na kartę
+    _manager.fetchNextEventsPage(isRefresh: true);
   }
 
   @override
@@ -29,10 +31,8 @@ class _EventsTabState extends State<EventsTab> {
     super.dispose();
   }
 
-  /// Niskopoziomowy detektor przewijania ekranu
   void _scrollListener() {
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      // Wyzwalaj pobieranie, gdy użytkownik jest 200 pikseli od końca listy
       _loadMoreData();
     }
   }
@@ -41,8 +41,6 @@ class _EventsTabState extends State<EventsTab> {
     if (_isFetchingMore || !_manager.hasMoreEvents) return;
 
     setState(() => _isFetchingMore = true);
-
-    // Pobranie kolejnej strony (20 sztuk)
     await _manager.fetchNextEventsPage();
 
     if (mounted) {
@@ -69,10 +67,8 @@ class _EventsTabState extends State<EventsTab> {
             controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(24.0),
-            // +1 dla Nagłówka, +1 dla wskaźnika ładowania na dole
             itemCount: events.isEmpty ? 2 : events.length + 2,
             itemBuilder: (context, index) {
-              // 1. Nagłówek ekranu
               if (index == 0) {
                 return const Padding(
                   padding: EdgeInsets.only(bottom: 24.0),
@@ -83,7 +79,6 @@ class _EventsTabState extends State<EventsTab> {
                 );
               }
 
-              // 2. Widok pusty
               if (events.isEmpty && index == 1) {
                 return SizedBox(
                   height: MediaQuery.of(context).size.height * 0.5,
@@ -96,7 +91,6 @@ class _EventsTabState extends State<EventsTab> {
                 );
               }
 
-              // 3. Ostatni element - Kółko ładowania (Sygnalizator paginacji)
               if (index == events.length + 1) {
                 return _manager.hasMoreEvents
                     ? const Padding(
@@ -116,7 +110,6 @@ class _EventsTabState extends State<EventsTab> {
                 );
               }
 
-              // 4. Renderowanie wiersza logu
               final event = events[index - 1];
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12.0),
@@ -137,6 +130,20 @@ class _EventsTabState extends State<EventsTab> {
     final IconData sourceIcon = isBle ? Icons.bluetooth_searching_rounded : Icons.wifi_tethering_rounded;
     final Color sourceColor = isBle ? const Color(0xFF00ADB5) : Colors.purpleAccent;
 
+    String displayMessage = event.message;
+    Color messageColor = Colors.white;
+
+    if (event.message.contains('UNLOCKED')) {
+      displayMessage = 'Zamek otworzono';
+      messageColor = Colors.green;
+    } else if (event.message.contains('LOCKED')) {
+      displayMessage = 'Zamek zamknięto';
+      messageColor = Colors.red;
+    } else if (event.message.contains('PIN_CHANGED')) {
+      displayMessage = 'Zmieniono PIN';
+      messageColor = Colors.orange;
+    }
+
     return CustomCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
@@ -152,8 +159,8 @@ class _EventsTabState extends State<EventsTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  event.message,
-                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                  displayMessage,
+                  style: TextStyle(color: messageColor, fontSize: 15, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 4),
                 Text(

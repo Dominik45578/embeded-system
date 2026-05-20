@@ -29,6 +29,8 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
   bool _isScanning = false;
   List<ScanResult> _scanResults = [];
   List<BluetoothDevice> _connectedDevices = [];
+  List<BluetoothDevice> _bondedDevices = []; // Sparowane w systemie
+  final BleDeviceManager _manager = BleDeviceManager();
 
   StreamSubscription<BluetoothAdapterState>? _adapterStateSubscription;
   StreamSubscription<bool>? _isScanningSubscription;
@@ -40,27 +42,23 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
     _initBluetoothLifecycle();
   }
 
-  /// Inicjalizacja reaktywnych subskrypcji warstwy bezprzewodowej
   void _initBluetoothLifecycle() {
-    // 1. Nasłuchiwanie zmian stanu adaptera oraz uprawnień systemowych
     _adapterStateSubscription = FlutterBluePlus.adapterState.listen((state) {
       if (mounted) {
         setState(() => _adapterState = state);
         if (state == BluetoothAdapterState.on) {
-          _fetchConnectedDevices();
+          _fetchConnectedAndBondedDevices();
           _startScan();
         }
       }
     });
 
-    // 2. Monitorowanie stanu pracy skanera radiowego
     _isScanningSubscription = FlutterBluePlus.isScanning.listen((scanning) {
       if (mounted) {
         setState(() => _isScanning = scanning);
       }
     });
 
-    // 3. Pobieranie wyników skanowania eteru
     _scanResultsSubscription = FlutterBluePlus.scanResults.listen((results) {
       if (mounted) {
         setState(() => _scanResults = results);
@@ -68,19 +66,30 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
     });
   }
 
-  /// Pobiera listę urządzeń aktualnie połączonych z aplikacją lub systemem
-  void _fetchConnectedDevices() {
+  Future<void> _fetchConnectedAndBondedDevices() async {
     try {
       final connected = FlutterBluePlus.connectedDevices;
+      List<BluetoothDevice> systemBonded = [];
+
+      try {
+        systemBonded = await FlutterBluePlus.systemDevices([]);
+      } catch (e) {
+        debugPrint('Nie można pobrać sparowanych urządzeń z systemu: $e');
+      }
+
+      if (!mounted) return;
+
       setState(() {
         _connectedDevices = connected;
+        _bondedDevices = systemBonded
+            .where((device) => !_manager.savedDevices.any((d) => d.id == device.remoteId.str))
+            .toList();
       });
     } catch (e) {
-      debugPrint('[DeviceScannerModal] Błąd pobierania aktywnych połączeń: $e');
+      debugPrint('[DeviceScannerModal] Błąd pobierania aktywnych/sparowanych połączeń: $e');
     }
   }
 
-  /// Bezpieczne uruchomienie skanowania
   Future<void> _startScan() async {
     if (_adapterState != BluetoothAdapterState.on) {
       if (Platform.isAndroid && _adapterState == BluetoothAdapterState.off) {
@@ -93,10 +102,9 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
       return;
     }
 
-    _fetchConnectedDevices();
+    await _fetchConnectedAndBondedDevices();
 
     try {
-      // Wywołanie bez parametrów filtrujących w celach testowo-diagnostycznych
       await FlutterBluePlus.startScan(
         timeout: const Duration(seconds: 15),
         androidUsesFineLocation: false,
@@ -126,7 +134,6 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
   Widget build(BuildContext context) {
     Widget modalContent;
 
-    // Maszyna stanów UI w zależności od kondycji warstwy GAP/OS
     if (_adapterState == BluetoothAdapterState.unauthorized) {
       modalContent = _buildPermissionErrorView();
     } else if (_adapterState == BluetoothAdapterState.off) {
@@ -171,7 +178,6 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
     );
   }
 
-  /// Widok błędu braku uprawnień systemowych (Android Runtime Permissions / iOS Info.plist)
   Widget _buildPermissionErrorView() {
     return Center(
       child: Padding(
@@ -207,7 +213,6 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
     );
   }
 
-  /// Widok informujący o wyłączonym module Bluetooth w telefonie
   Widget _buildBluetoothOffView() {
     return Center(
       child: Padding(
@@ -251,16 +256,17 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
     );
   }
 
-  /// Buduje listę z podziałem na sekcje urządzeń połączonych oraz wykrytych w eterze
   Widget _buildDeviceListView() {
     final connectedIds = _connectedDevices.map((d) => d.remoteId.str).toSet();
+    final bondedIds = _bondedDevices.map((d) => d.remoteId.str).toSet();
 
-    // Eliminacja duplikacji: odrzucamy ze skanu te, które są już jawnie zmapowane jako połączone
     final discoveredResults = _scanResults
-        .where((result) => !connectedIds.contains(result.device.remoteId.str))
+        .where((result) => 
+            !connectedIds.contains(result.device.remoteId.str) && 
+            !bondedIds.contains(result.device.remoteId.str))
         .toList();
 
-    if (_connectedDevices.isEmpty && discoveredResults.isEmpty && !_isScanning) {
+    if (_connectedDevices.isEmpty && discoveredResults.isEmpty && _bondedDevices.isEmpty && !_isScanning) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -285,7 +291,23 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
     return ListView(
       physics: const BouncingScrollPhysics(),
       children: [
-        // SEKCOJA 1: Urządzenia połączone
+        // Sugerowane - systemowo sparowane, których nie ma w aplikacji
+        if (_bondedDevices.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8.0),
+            child: Text(
+              'Zapisane w telefonie (Sugerowane)',
+              style: TextStyle(color: Colors.orangeAccent, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+            ),
+          ),
+          ..._bondedDevices.map((device) => _buildDeviceTile(
+            device: device,
+            iconColor: Colors.orangeAccent,
+            backgroundColor: Colors.white10,
+          )),
+          const SizedBox(height: 16),
+        ],
+
         if (_connectedDevices.isNotEmpty) ...[
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8.0),
@@ -298,7 +320,6 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
           const SizedBox(height: 16),
         ],
 
-        // SEKCJA 2: Urządzenia wykryte w locie
         if (discoveredResults.isNotEmpty) ...[
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8.0),
@@ -307,7 +328,11 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
               style: TextStyle(color: Color(0xFF00ADB5), fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5),
             ),
           ),
-          ...discoveredResults.map((result) => _buildDiscoveredDeviceTile(result)),
+          ...discoveredResults.map((result) => _buildDeviceTile(
+            device: result.device,
+            iconColor: const Color(0xFF00ADB5),
+            backgroundColor: Colors.white10,
+          )),
         ],
       ],
     );
@@ -324,30 +349,32 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
       ),
       title: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
       subtitle: Text(device.remoteId.str, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.green.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.green.withOpacity(0.5)),
+      trailing: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          elevation: 0,
         ),
-        child: const Text(
-          'Aktywne',
-          style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold),
-        ),
+        onPressed: () async {
+          FlutterBluePlus.stopScan();
+          await _manager.saveAndConnectDevice(device);
+          if (mounted) Navigator.pop(context);
+        },
+        child: const Text('Dodaj', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }
 
-  Widget _buildDiscoveredDeviceTile(ScanResult result) {
-    final device = result.device;
+  Widget _buildDeviceTile({required BluetoothDevice device, required Color iconColor, required Color backgroundColor}) {
     final name = device.platformName.isNotEmpty ? device.platformName : "Urządzenie centralne";
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: const CircleAvatar(
-        backgroundColor: Colors.white10,
+      leading: CircleAvatar(
+        backgroundColor: backgroundColor,
         radius: 18,
-        child: Icon(Icons.bluetooth, color: Color(0xFF00ADB5), size: 20),
+        child: Icon(Icons.bluetooth, color: iconColor, size: 20),
       ),
       title: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
       subtitle: Text(device.remoteId.str, style: const TextStyle(color: Colors.grey, fontSize: 12)),
@@ -361,10 +388,10 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
         ),
         onPressed: () async {
           FlutterBluePlus.stopScan();
-          await BleDeviceManager().saveAndConnectDevice(device);
+          await _manager.saveAndConnectDevice(device);
           if (mounted) Navigator.pop(context);
         },
-        child: const Text('Połącz', style: TextStyle(fontWeight: FontWeight.bold)),
+        child: const Text('Dodaj', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }

@@ -8,6 +8,7 @@
 #include "AppIdentity.hpp"
 #include "MqttManager.hpp"
 #include "LockController.hpp"
+#include "BleConfigController.hpp"
 
 const char* GLOBAL_TOPIC = "topicCinkus";
 
@@ -17,8 +18,8 @@ KeypadLockController* keypad_controller;
 BleAppController* ble_app_controller;
 BleLockController* ble_lock_controller;
 BleConnectionController* ble_connection_controller;
-
-LockSystemState lastSystemState = LockSystemState::IDLE_LOCKED;
+BleConfigController* ble_config_controller;
+LockSystemState lastSystemState = LockSystemState::IDLE_STARTED;
 
 
 
@@ -42,6 +43,7 @@ String sourceToString(ActionSource source) {
 String stateToString(LockSystemState state) {
     switch (state) {
         case LockSystemState::IDLE_LOCKED:   return "IDLE_LOCKED";
+        case LockSystemState::IDLE_STARTED: return "IDLE_STARTED";
         case LockSystemState::ENTERING_PIN:  return "ENTERING_PIN";
         case LockSystemState::CHANGING_PIN:  return "CHANGING_PIN";
         case LockSystemState::UNLOCKED:      return "UNLOCKED";
@@ -51,6 +53,7 @@ String stateToString(LockSystemState state) {
 }
 
 void setup() {
+    load();
     Serial.begin(115200);
     Serial.println("[System] Uruchamianie zamka...");
     configTime(3600, 3600, "pool.ntp.org", "time.nist.gov");
@@ -85,6 +88,11 @@ void setup() {
     
     ble_lock_controller = new BleLockController();
     ble_lock_controller->init();
+
+    ble_config_controller = new BleConfigController();
+    ble_config_controller->init();
+    MqttMessage mqttMessage = MqttMessage(getDeviceId(), stateToString(LockSystemState::IDLE_STARTED), sourceToString(ActionSource::SYSTEM));
+    mqtt_manager->publish(mqttMessage);
 
     Serial.println("[System] Inicjalizacja zakończona pomyślnie. System gotowy.");
 }

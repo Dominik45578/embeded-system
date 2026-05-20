@@ -1,5 +1,5 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
 
 import '../api/api_client.dart';
 import '../model/auth_token_dto.dart';
@@ -28,21 +28,21 @@ class IdentityService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiClient.getIdentity('user/$uuid');
+      final Response response = await _apiClient.getIdentity('user/$uuid');
+      
       if (response.statusCode == 200) {
-        final Map<String, dynamic> decoded = jsonDecode(response.body);
-        _currentUserRecord = UserRecordDto.fromJson(decoded);
+        // Dio automatycznie dekoduje JSON, więc używamy response.data
+        _currentUserRecord = UserRecordDto.fromJson(response.data);
         return _currentUserRecord;
       } else {
-        _errorMessage = 'Błąd pobierania tożsamości: ${response.statusCode}';
+        _errorMessage = 'Błąd pobierania tożsamości: ${response.statusCode} - ${response.statusMessage}';
       }
     } catch (e) {
       _errorMessage = e.toString();
       if (kDebugMode) {
         print(_errorMessage);
       }
-    } //
-    finally {
+    } finally {
       _isLoading = false;
       notifyListeners();
     }
@@ -55,13 +55,13 @@ class IdentityService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiClient.postIdentity('user/auth', {'idToken': idToken});
+      final Response response = await _apiClient.postIdentity('user/auth', {'idToken': idToken});
+      
       if (response.statusCode == 200) {
-        final Map<String, dynamic> decoded = jsonDecode(response.body);
-        _currentAuthToken = AuthTokenDto.fromJson(decoded);
+        _currentAuthToken = AuthTokenDto.fromJson(response.data);
         return _currentAuthToken;
       } else {
-        _errorMessage = 'Błąd weryfikacji tokenu: ${response.statusCode}';
+        _errorMessage = 'Błąd weryfikacji tokenu: ${response.statusCode} - ${response.statusMessage}';
       }
     } catch (e) {
       _errorMessage = e.toString();

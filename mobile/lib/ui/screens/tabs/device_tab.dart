@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/model/device.dart';
 import '../../../core/services/ble/ble_device_manger.dart';
 import 'device_scanner_modal.dart';
 import 'dynamic_lock_card.dart';
@@ -9,10 +10,7 @@ class DevicesTab extends StatelessWidget {
 
   Future<void> _handleRefresh() async {
     final manager = BleDeviceManager();
-    for (var deviceId in manager.savedDeviceIds) {
-      if (manager.getConnection(deviceId) == null) {
-      }
-    }
+    await manager.init();
   }
 
   @override
@@ -24,7 +22,7 @@ class DevicesTab extends StatelessWidget {
       child: ListenableBuilder(
         listenable: BleDeviceManager(),
         builder: (context, child) {
-          final savedDevices = BleDeviceManager().savedDeviceIds;
+          final savedDevices = BleDeviceManager().savedDevices;
 
           return ListView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -47,16 +45,19 @@ class DevicesTab extends StatelessWidget {
 
               if (savedDevices.isEmpty)
                 const Center(
-                  child: Text(
-                    'Brak dodanych urządzeń.\nKliknij + aby wyszukać.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 50.0),
+                    child: Text(
+                      'Brak dodanych urządzeń.\nKliknij + aby wyszukać.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey, fontSize: 16),
+                    ),
                   ),
                 )
               else
-                ...savedDevices.map((id) => Padding(
+                ...savedDevices.map((device) => Padding(
                   padding: const EdgeInsets.only(bottom: 16.0),
-                  child: DynamicLockCard(deviceId: id),
+                  child: DynamicLockCard(device: device),
                 )),
             ],
           );

@@ -2,7 +2,7 @@
 #include "ConfigManager.hpp"
 
 BleLockController::BleLockController() {
-    lastNotifiedState_ = LockSystemState::IDLE_LOCKED;
+    lastNotifiedState_ = LockSystemState::IDLE_STARTED;
 }
 
 void BleLockController::init() {

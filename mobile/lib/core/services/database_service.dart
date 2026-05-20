@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import '../model/device.dart';
 import '../model/device_event.dart';
 
 class DatabaseService {
@@ -16,11 +17,11 @@ class DatabaseService {
 
   Future<Database> _initDb() async {
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'lockly_events.db');
+    final path = join(dbPath, 'lockly.db');
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 3,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE events (
@@ -30,11 +31,35 @@ class DatabaseService {
             source TEXT
           )
         ''');
+        await db.execute('''
+          CREATE TABLE devices (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            isBlocked INTEGER,
+            isConnected INTEGER
+          )
+        ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('''
+            CREATE TABLE devices (
+              id TEXT PRIMARY KEY,
+              name TEXT,
+              isBlocked INTEGER,
+              isConnected INTEGER
+            )
+          ''');
+        }
+        if (oldVersion < 3) {
+          await db.execute('ALTER TABLE devices ADD COLUMN name TEXT');
+          await db.execute('ALTER TABLE devices ADD COLUMN isBlocked INTEGER');
+          await db.execute('ALTER TABLE devices ADD COLUMN isConnected INTEGER');
+        }
       },
     );
   }
 
-  /// Zapisuje pojedyncze zdarzenie do bazy SQLite
   Future<void> insertEvent(DeviceEvent event) async {
     final db = await database;
     await db.insert(
@@ -49,7 +74,6 @@ class DatabaseService {
     );
   }
 
-  /// Pobiera spagowaną listę zdarzeń z bazy przy użyciu LIMIT i OFFSET
   Future<List<DeviceEvent>> getPagedEvents(int limit, int offset) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
@@ -70,5 +94,50 @@ class DatabaseService {
         ),
       );
     }).toList();
+  }
+
+  Future<void> insertDevice(Device device) async {
+    final db = await database;
+    await db.insert(
+      'devices',
+      {
+        'id': device.id,
+        'name': device.name,
+        'isBlocked': device.isBlocked ? 1 : 0,
+        'isConnected': 0, // Assume not connected when inserting
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteDevice(String deviceId) async {
+    final db = await database;
+    await db.delete(
+      'devices',
+      where: 'id = ?',
+      whereArgs: [deviceId],
+    );
+  }
+
+  Future<List<Device>> getSavedDevices() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('devices');
+    return maps.map((map) {
+      return Device(
+        id: map['id'] as String,
+        name: map['name'] as String? ?? '',
+        isBlocked: (map['isBlocked'] as int? ?? 0) == 1,
+      );
+    }).toList();
+  }
+
+  Future<void> updateDeviceConnectionState(String deviceId, bool isConnected) async {
+    final db = await database;
+    await db.update(
+      'devices',
+      {'isConnected': isConnected ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [deviceId],
+    );
   }
 }
