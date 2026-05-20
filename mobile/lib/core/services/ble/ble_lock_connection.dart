@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../../model/lock_command.dart';
@@ -18,14 +19,31 @@ class BleLockConnection {
 
   Stream<String> get lockStateStream => _stateController.stream;
 
-  // Strumień statusu połączenia BLE (connected / disconnected)
   Stream<BluetoothConnectionState> get connectionStateStream => _device.connectionState;
 
   String getDeviceId() => _device.remoteId.str;
 
   Future<void> connect() async {
-    await _device.connect(autoConnect: true, license: License.free);
-    await _device.requestMtu(512);
+    await _device.connect(autoConnect: false, license: License.free);
+
+    await Future.delayed(const Duration(milliseconds: 300));
+    try {
+      debugPrint('[BLE] Inicjalizacja procedury parowania/bondingu...');
+
+      await _device.createBond();
+      debugPrint('[BLE] Urządzenie pomyślnie sparowane (Bonded).');
+    } catch (e) {
+      debugPrint('[BLE] Ostrzeżenie podczas parowania (prawdopodobnie już sparowane): $e');
+    }
+
+    // 3. Negocjacja wielkości pakietu MTU
+    try {
+      await _device.requestMtu(512).timeout(const Duration(seconds: 2));
+    } catch (e) {
+      debugPrint('[BLE] Negocjacja MTU nieudana: $e. Kontynuacja z domyślnym MTU.');
+    }
+
+    // 4. Odkrywanie usług i rejestracja subskrypcji strumienia statusu rygla
     await _discoverServices();
   }
 

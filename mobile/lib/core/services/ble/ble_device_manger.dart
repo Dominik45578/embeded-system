@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../model/device_event.dart';
 import '../../model/lock_command.dart';
+import '../database_service.dart';
 import 'ble_lock_connection.dart';
 
 class BleDeviceManager extends ChangeNotifier {
@@ -11,6 +15,14 @@ class BleDeviceManager extends ChangeNotifier {
   BleDeviceManager._internal();
 
   static const String _storageKey = 'bonded_ble_devices';
+  final List<DeviceEvent> _events = [];
+  List<DeviceEvent> get events => List.unmodifiable(_events);
+
+  bool _hasMoreEvents = true;
+  bool get hasMoreEvents => _hasMoreEvents;
+
+  final DatabaseService _dbService = DatabaseService.instance;
+  final Map<String, StreamSubscription> _streamSubscriptions = {};
 
   // Słownik aktywnych obiektów sesji sesji połączeń
   final Map<String, BleLockConnection> _activeConnections = {};
@@ -24,7 +36,8 @@ class BleDeviceManager extends ChangeNotifier {
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _savedDeviceIds = prefs.getStringList(_storageKey) ?? [];
-    notifyListeners();
+
+    await fetchNextEventsPage(isRefresh: true);
   }
 
   BleLockConnection? getConnection(String deviceId) => _activeConnections[deviceId];
@@ -58,16 +71,21 @@ class BleDeviceManager extends ChangeNotifier {
 
   Future<BleLockConnection> connectToDevice(BluetoothDevice device) async {
     final deviceId = device.remoteId.str;
-    
+
     if (_activeConnections.containsKey(deviceId)) {
       return _activeConnections[deviceId]!;
     }
 
     final connection = BleLockConnection(device);
     await connection.connect();
-    
+
     _activeConnections[deviceId] = connection;
-    notifyListeners(); // UI dowiaduje się, że status uległ zmianie na "Połączony"
+
+    _streamSubscriptions[deviceId] = connection.lockStateStream.listen((rawMessage) {
+      logEvent(rawMessage, EventSource.bluetooth);
+    });
+
+    notifyListeners();
     return connection;
   }
 
@@ -86,5 +104,41 @@ class BleDeviceManager extends ChangeNotifier {
     } else {
       throw Exception('Urządzenie $deviceId nie jest połączone.');
     }
+  }
+
+  Future<void> fetchNextEventsPage({bool isRefresh = false}) async {
+    if (isRefresh) {
+      _events.clear();
+      _hasMoreEvents = true;
+    }
+
+    if (!_hasMoreEvents) return;
+
+    final int currentOffset = _events.length;
+    final List<DeviceEvent> newPage = await _dbService.getPagedEvents(20, currentOffset);
+
+    if (newPage.length < 20) {
+      _hasMoreEvents = false; // Baza nie ma więcej rekordów
+    }
+
+    _events.addAll(newPage);
+    notifyListeners();
+  }
+
+  /// Zapisuje zdarzenie w bazie i aktualizuje reaktywny bufor w pamięci operacyjnej
+  Future<void> logEvent(String message, EventSource source) async {
+    final newEvent = DeviceEvent(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      message: message,
+      timestamp: DateTime.now(),
+      source: source,
+    );
+
+    // 1. Zapis trwały w bazie danych
+    await _dbService.insertEvent(newEvent);
+
+    // 2. Aktualizacja pamięci podręcznej UI (wstrzyknięcie na początek listy)
+    _events.insert(0, newEvent);
+    notifyListeners();
   }
 }
