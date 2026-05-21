@@ -21,6 +21,9 @@ public class User {
     @Column(unique = true)
     private String email;
 
+    @Column(name = "fcm_token")
+    private String fcmToken;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private List<Device> devices = new ArrayList<>();

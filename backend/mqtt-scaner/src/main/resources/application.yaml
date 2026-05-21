@@ -4,7 +4,7 @@ spring:
     url: ${BACKEND_MQTT_HOST}
     client-id: ${BACKEND_MQTT_CLIENT_ID:spring-mqtt-scanner}
     topics:
-      - "#"
+      - "lockly/logs"
     default-qos: ${BACKEND_MQTT_DEFAULT_QOS:1}
 
     # username: ${BACKEND_MQTT_USERNAME}

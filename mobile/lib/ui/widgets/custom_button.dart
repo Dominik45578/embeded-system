@@ -4,7 +4,7 @@ enum CustomButtonType { primary, secondary, danger }
 
 class CustomButton extends StatelessWidget {
   final String text;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final CustomButtonType type;
   final IconData? icon;
   final bool isFullWidth;

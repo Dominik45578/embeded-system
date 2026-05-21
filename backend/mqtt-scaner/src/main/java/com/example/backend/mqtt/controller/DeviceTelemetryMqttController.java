@@ -15,7 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 public class DeviceTelemetryMqttController {
 
     private final DeviceLogProcessingService logProcessingService;
-    @MqttMapping("device/logs")
+    @MqttMapping("lockly/logs")
     public void handleDeviceLogs(
             @MqttPayload LockLogRequest request) {
 

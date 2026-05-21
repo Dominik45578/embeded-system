@@ -5,8 +5,6 @@ BleAppController::BleAppController() : currentState(BleAppState::OFF) {}
 void BleAppController::init() {
     Serial.println("[BleAppController] Inicjalizacja bluetooth....");
     BleManager::getInstance().init("Lockly-Zamek");
-    BleManager::getInstance().manageAdvertising(BleAdvertisingMode::FAST);
-
 
     Serial.println("[BleAppController] Inicjalizacja kontrolera...");
     BleManager::getInstance().createNewService("FF10")
@@ -17,7 +15,6 @@ void BleAppController::init() {
         .buildService();
 
     int pairedCount = BleManager::getInstance().getPairedCount(); 
-
     if (pairedCount > 0) {
         changeState(BleAppState::IDLE_SCAN);
     } else {

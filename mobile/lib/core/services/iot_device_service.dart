@@ -1,72 +1,117 @@
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
-
+import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../api/api_client.dart';
-import '../model/device.dart';
+import '../model/iot_device.dart';
+import '../model/device_telemetry_point.dart';
 
-
-class IotDeviceService extends ChangeNotifier {
-  IotDeviceService._internal();
-  static final IotDeviceService instance = IotDeviceService._internal();
-
+class IotDeviceService {
   final ApiClient _apiClient = ApiClient.instance;
 
-  List<Device> _devices = const [];
-  bool _isLoading = false;
-  String? _errorMessage;
+  Future<List<IotDevice>> getDevicesForCurrentUser() async {
+    final Response response = await _apiClient.getIot('/devices');
 
-  List<Device> get devices => _devices;
-  bool get isLoading => _isLoading;
-  String? get errorMessage => _errorMessage;
-
-  Future<void> fetchMyDevices() async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      final response = await _apiClient.getIot('/devices');
-      if (response.statusCode == 200) {
-        final List<dynamic> decodedData = jsonDecode(response.body);
-        _devices = decodedData.map((json) => Device.fromJson(json)).toList();
-      } else {
-        _errorMessage = 'Błąd pobierania urządzeń: ${response.statusCode}';
-      }
-    } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+    if (response.statusCode == 200) {
+      final List<dynamic> data = response.data;
+      return data.map((json) => IotDevice.fromJson(json)).toList();
+    } else {
+      throw Exception('Nie udało się załadować urządzeń: ${response.statusCode}');
     }
   }
 
-  Future<bool> sendCommand(String deviceId, String command) async {
+  Future<IotDevice?> getDeviceDetails(String deviceId) async {
     try {
-      final response = await _apiClient.postIot('/devices/command', {
-        'deviceId': deviceId,
-        'command': command,
-      });
-      return response.statusCode == 202;
+      final devices = await getDevicesForCurrentUser();
+      return devices.firstWhere((d) => d.deviceId == deviceId);
     } catch (e) {
-      _errorMessage = e.toString();
-      notifyListeners();
-      return false;
+      if (e is StateError) {
+        return null; // Nie znaleziono urządzenia w pobranej liście
+      }
+      rethrow;
+    }
+  }
+
+  Future<IotDevice> addDevice({
+    required String deviceId,
+    String? deviceName,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception("Brak zalogowanego użytkownika w Firebase Auth.");
+    }
+
+    final Response response = await _apiClient.postIot('/devices/add', {
+      'deviceId': deviceId,
+      'deviceName': deviceName ?? 'Nowy zamek',
+      'uuid': user.uid, // Przesyłamy UUID konta użytkownika
+    });
+
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return IotDevice.fromJson(response.data);
+    } else {
+      throw Exception('Nie udało się dodać urządzenia: ${response.statusCode} - ${response.data}');
+    }
+  }
+
+  Future<void> sendCommand(String deviceId, String command) async {
+    final Response response = await _apiClient.postIot('/devices/command', {
+      'deviceId': deviceId,
+      'command': command,
+    });
+
+    if (response.statusCode != 202 && response.statusCode != 200) {
+      throw Exception('Błąd podczas wysyłania komendy: ${response.statusCode}');
     }
   }
 
   Future<void> toggleDeviceBlock(String deviceId, bool block) async {
+    final Response response = await _apiClient.patchIot(
+      '/devices/$deviceId/block?block=$block',
+    );
+
+    if (response.statusCode != 204 && response.statusCode != 200) {
+      throw Exception('Nie udało się zmienić stanu blokady: ${response.statusCode}');
+    }
+  }
+
+  Future<bool> checkIsAlive(String deviceId) async {
+    final Response response = await _apiClient.getIot('/devices/$deviceId/alive');
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = response.data;
+      return data['alive'] ?? false;
+    } else {
+      throw Exception('Błąd podczas sprawdzania statusu alive: ${response.statusCode}');
+    }
+  }
+
+  Future<List<DeviceTelemetryPoint>> getDeviceTelemetry(
+      String deviceId, {
+        String range = '-24h',
+      }) async {
+    final Response response = await _apiClient.getIot(
+      '/devices/$deviceId/telemetry?range=$range',
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = response.data;
+      return data.map((json) => DeviceTelemetryPoint.fromJson(json)).toList();
+    } else {
+      throw Exception('Nie udało się załadować telemetrii: ${response.statusCode}');
+    }
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
+  Future<void> deleteDevice(String hardwareId) async {
     try {
-      final response = await _apiClient.patchIot('/devices/$deviceId/block?block=$block');
-      if (response.statusCode == 204) {
-        final int index = _devices.indexWhere((device) => device.id == deviceId);
-        if (index != -1) {
-          _devices[index] = _devices[index].copyWith(isBlocked: block);
-          notifyListeners();
-        }
+      final Response response = await _apiClient.deleteIot('/devices/$hardwareId');
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw Exception('Serwer zwrócił nieoczekiwany kod statusu: ${response.statusCode}');
       }
-    } catch (e) {
-      _errorMessage = e.toString();
-      notifyListeners();
+    } on DioException catch (e) {
+      throw Exception('Błąd sieciowy podczas usuwania urządzenia: ${e.message}');
     }
   }
 }

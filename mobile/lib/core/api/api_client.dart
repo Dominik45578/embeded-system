@@ -17,11 +17,12 @@ class ApiClient {
       ),
     );
   }
-  
+
   static final ApiClient instance = ApiClient._internal();
 
   late final Dio _dio;
-  final ConnectionConfigService _configService = ConnectionConfigService.instance;
+  final ConnectionConfigService _configService =
+      ConnectionConfigService.instance;
 
   String get identityApi => _configService.config.identityBaseUrl;
   String get iotApi => _configService.config.iotBaseUrl;
@@ -45,7 +46,10 @@ class ApiClient {
     return await _dio.get(url, options: Options(headers: headers));
   }
 
-  Future<Response> postIdentity(String endpoint, Map<String, dynamic> body) async {
+  Future<Response> postIdentity(
+    String endpoint,
+    Map<String, dynamic> body,
+  ) async {
     final url = '$identityApi$endpoint';
     final headers = await _getHeaders();
     return await _dio.post(url, data: body, options: Options(headers: headers));
@@ -65,9 +69,20 @@ class ApiClient {
     return await _dio.post(url, data: body, options: Options(headers: headers));
   }
 
+  Future<Response> putIot(String endpoint, Map<String, dynamic> body) async {
+    final url = '$iotApi$endpoint';
+    final headers = await _getHeaders();
+    return await _dio.put(url, data: body, options: Options(headers: headers));
+  }
+
   Future<Response> patchIot(String endpoint, {Map<String, dynamic>? body}) async {
     final url = '$iotApi$endpoint';
     final headers = await _getHeaders();
     return await _dio.patch(url, data: body, options: Options(headers: headers));
+  }
+  Future<Response> deleteIot(String endpoint, {Map<String, dynamic>? body}) async {
+    final url = '$iotApi$endpoint';
+    final headers = await _getHeaders();
+    return await _dio.delete(url, data: body, options: Options(headers: headers));
   }
 }

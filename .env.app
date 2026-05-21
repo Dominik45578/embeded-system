@@ -26,11 +26,11 @@ BACKEND_PORT=12200
 BACKEND_ISSUER_URI=https://your-auth-domain/realms/lockly
 BACKEND_JWK_SET_URI=https://your-auth-domain/realms/lockly/protocol/openid-connect/certs
 
-BACKEND_MQTT_HOST=tcp://mqtt-broker:1883
-BACKEND_MQTT_TOPIC=#
+BACKEND_MQTT_HOST=tcp://broker.hivemq.com
+BACKEND_MQTT_TOPIC=lockly/iot
 
 BACKEND_INFLUX_HOST=http://influxdb:8086
-BACKEND_INFLUX_TOKEN=super-secret-token
+BACKEND_INFLUX_TOKEN=Ojdp9UGN9O4092hnJsXcvnYarEh2COW_Ntg9UWHZb6aO7nRjT9cuP1Fs_k346xBSZOb92TEToIRe0l5-xoWSEQ==
 BACKEND_INFLUX_BUCKET=iot
 BACKEND_INFLUX_ORG=lockly
 

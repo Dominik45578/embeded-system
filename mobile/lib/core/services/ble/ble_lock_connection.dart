@@ -16,16 +16,15 @@ class BleLockConnection {
   BluetoothCharacteristic? _deviceIdChar;
 
   // FF40 Service
-  BluetoothCharacteristic? _wifiReadChar;
-  BluetoothCharacteristic? _wifiWriteChar;
-  BluetoothCharacteristic? _mqttReadChar;
-  BluetoothCharacteristic? _mqttWriteChar;
-  BluetoothCharacteristic? _configStateChar;
-
+  BluetoothCharacteristic? _wifiReadChar; // FF41 (legacy)
+  BluetoothCharacteristic? _wifiWriteChar; // FF42
+  BluetoothCharacteristic? _mqttReadChar; // FF43 (legacy)
+  BluetoothCharacteristic? _mqttWriteChar; // FF44
+  BluetoothCharacteristic? _configStateChar; // FF45
+  BluetoothCharacteristic? _configJsonChar; // FF46 (new JSON)
 
   final StreamController<String> _stateController = StreamController<String>.broadcast();
   StreamSubscription<List<int>>? _notifySubscription;
-  StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
 
   BleLockConnection(this._device);
 
@@ -37,7 +36,18 @@ class BleLockConnection {
 
   // Krok 1: Fizyczne połączenie i parowanie
   Future<void> connect() async {
+    // Wracamy do autoConnect: false, aby uniknąć konfliktów systemowych
     await _device.connect(autoConnect: false, license: License.free);
+
+    // Aby wysyłać wiadomości dłuższe niż 20 bajtów (np. MQTT 'broker,topic'),
+    // próbujemy wynegocjować wyższe MTU. Robimy to w bloku try/catch, 
+    // aby nie przerywało połączenia w przypadku problemów z konkretnym stosem BLE.
+    try {
+      await _device.requestMtu(512);
+      debugPrint('[BLE] MTU wynegocjowane pomyślnie.');
+    } catch (e) {
+      debugPrint('[BLE] Ostrzeżenie: Negocjacja MTU nie powiodła się: $e');
+    }
 
     await Future.delayed(const Duration(milliseconds: 300));
     try {
@@ -51,12 +61,6 @@ class BleLockConnection {
 
   // Krok 2: Odkrycie usług i konfiguracja (może być wywołane dla już połączonego urządzenia)
   Future<void> discoverServicesAndSetup() async {
-    try {
-      await _device.requestMtu(512).timeout(const Duration(seconds: 2));
-    } catch (e) {
-      debugPrint('[BLE] Negocjacja MTU nieudana: $e. Kontynuacja z domyślnym MTU.');
-    }
-
     final services = await _device.discoverServices();
     for (var service in services) {
       // Serwis FF20 - Sterowanie zamkiem
@@ -75,7 +79,7 @@ class BleLockConnection {
           if (char.uuid == Guid("FF31")) _deviceIdChar = char;
         }
       }
-      // Serwis FF40 - Konfiguracja
+      // Serwis FF40 - Konfiguracja sieciowa
       else if (service.uuid == Guid("FF40")) {
         for (var char in service.characteristics) {
           if (char.uuid == Guid("FF41")) _wifiReadChar = char;
@@ -83,16 +87,26 @@ class BleLockConnection {
           if (char.uuid == Guid("FF43")) _mqttReadChar = char;
           if (char.uuid == Guid("FF44")) _mqttWriteChar = char;
           if (char.uuid == Guid("FF45")) _configStateChar = char;
+          if (char.uuid == Guid("FF46")) _configJsonChar = char;
         }
       }
     }
   }
 
   Future<void> disconnect() async {
-    await _connectionStateSubscription?.cancel();
     await _notifySubscription?.cancel();
     await _stateController.close();
     await _device.disconnect();
+  }
+
+  Future<void> performKeepAlive() async {
+    try {
+      await _device.readRssi();
+      debugPrint('[BLE Keep-Alive] Odczytano RSSI dla ${getDeviceId()}');
+    } catch (e) {
+      debugPrint('[BLE Keep-Alive] Błąd podczas odczytu RSSI: $e');
+      // Błąd może oznaczać, że połączenie zostało zerwane. Manager to obsłuży.
+    }
   }
 
   Future<void> sendCommand(LockCommand command) async {
@@ -107,39 +121,61 @@ class BleLockConnection {
     return utf8.decode(value);
   }
 
-  Future<String> readWifiSsid() async {
-    if (_wifiReadChar == null) throw Exception('Brak charakterystyki odczytu Wi-Fi FF41.');
-    final value = await _wifiReadChar!.read();
-    return utf8.decode(value);
+  // --- Nowa logika konfiguracji oparta na nowym firmware ---
+
+  Future<Map<String, dynamic>> readConfigJson() async {
+    if (_configJsonChar == null) throw Exception('Brak charakterystyki odczytu JSON FF46.');
+    final value = await _configJsonChar!.read();
+    final jsonString = utf8.decode(value);
+    
+    if (jsonString.isEmpty) {
+        return {};
+    }
+    
+    try {
+        return jsonDecode(jsonString) as Map<String, dynamic>;
+    } catch (e) {
+        debugPrint('[BLE] Błąd parsowania JSON z FF46: $e');
+        return {};
+    }
   }
 
   Future<void> writeWifiCredentials(String ssid, String password) async {
     if (_wifiWriteChar == null) throw Exception('Brak charakterystyki zapisu Wi-Fi FF42.');
     if (_configStateChar == null) throw Exception('Brak charakterystyki stanu konfiguracji FF45.');
 
-    await _configStateChar!.write([1]);
-    await _wifiWriteChar!.write(utf8.encode(ssid));
-    await _wifiWriteChar!.write(utf8.encode(password));
-    await _configStateChar!.write([2]);
-  }
-
-  Future<Map<String, String>> readMqttConfig() async {
-    if (_mqttReadChar == null) throw Exception('Brak charakterystyki odczytu MQTT FF43.');
-    final value = await _mqttReadChar!.read();
-    final parts = utf8.decode(value).split(',');
-    if (parts.length == 2) {
-      return {'broker': parts[0], 'topic': parts[1]};
-    }
-    return {'broker': '', 'topic': ''};
+    await _configStateChar!.write([1], withoutResponse: false);
+    await Future.delayed(const Duration(milliseconds: 100)); 
+    
+    await _wifiWriteChar!.write(utf8.encode(ssid), withoutResponse: false);
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    await _wifiWriteChar!.write(utf8.encode(password), withoutResponse: false);
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    await _configStateChar!.write([2], withoutResponse: false);
   }
 
   Future<void> writeMqttConfig(String broker, String topic) async {
     if (_mqttWriteChar == null) throw Exception('Brak charakterystyki zapisu MQTT FF44.');
     if (_configStateChar == null) throw Exception('Brak charakterystyki stanu konfiguracji FF45.');
 
-    await _configStateChar!.write([3]);
-    await _mqttWriteChar!.write(utf8.encode('$broker,$topic'));
-    await _configStateChar!.write([4]);
+    await _configStateChar!.write([3], withoutResponse: false);
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    // Zgodnie ze specyfikacją ESP32 wysyłamy format 'broker,topic'
+    final mqttCombined = '$broker,$topic';
+    
+    // allowLongWrite: true zapobiega problemom przy braku MTU dla payloadu >20 bajtów
+    await _mqttWriteChar!.write(utf8.encode(mqttCombined), withoutResponse: false, allowLongWrite: true);
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    await _configStateChar!.write([4], withoutResponse: false);
+  }
+
+  Future<void> rebootDevice() async {
+      if (_configStateChar == null) throw Exception('Brak charakterystyki stanu konfiguracji FF45.');
+      await _configStateChar!.write([5], withoutResponse: false);
   }
 
   Future<void> _setupNotifications() async {

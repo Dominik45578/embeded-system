@@ -10,7 +10,7 @@
 #include "LockController.hpp"
 #include "BleConfigController.hpp"
 
-const char* GLOBAL_TOPIC = "topicCinkus";
+const char* GLOBAL_TOPIC = "lockly/logs";
 
 LedcSerwoManager servo;
 MqttManager* mqtt_manager;
@@ -22,7 +22,8 @@ BleConfigController* ble_config_controller;
 LockSystemState lastSystemState = LockSystemState::IDLE_STARTED;
 
 
-
+unsigned long lastKeepAlive = 0;
+const unsigned long KEEP_ALIVE_INTERVAL = 300000;
 void resetLeds() {
     digitalWrite(RED_LED, LOW);
     digitalWrite(GREEN_LED, LOW);
@@ -48,6 +49,7 @@ String stateToString(LockSystemState state) {
         case LockSystemState::CHANGING_PIN:  return "CHANGING_PIN";
         case LockSystemState::UNLOCKED:      return "UNLOCKED";
         case LockSystemState::BLOCKED_TEMP:  return "BLOCKED_TEMP";
+        case LockSystemState::IDLE_KEEP_ALIVE: return "IDLE_KEEP_ALIVE";
         default:                             return "UNKNOWN";
     }
 }
@@ -77,7 +79,7 @@ void setup() {
 
     Serial.print("DeviceId: "); Serial.println(getDeviceId());
 
-    mqtt_manager = new MqttManager(GLOBAL_TOPIC, getDeviceId());
+    mqtt_manager = new MqttManager(GLOBAL_TOPIC, "lockly/device/"+getDeviceId());
     mqtt_manager->setupWiFi();
 
     ble_app_controller = new BleAppController();
@@ -91,6 +93,7 @@ void setup() {
 
     ble_config_controller = new BleConfigController();
     ble_config_controller->init();
+    BleManager::getInstance().manageAdvertising(BleAdvertisingMode::FAST);
     MqttMessage mqttMessage = MqttMessage(getDeviceId(), stateToString(LockSystemState::IDLE_STARTED), sourceToString(ActionSource::SYSTEM));
     mqtt_manager->publish(mqttMessage);
 
@@ -118,6 +121,19 @@ void loop() {
         
         lastSystemState = currentState;
     }
+    if (millis() - lastKeepAlive >= KEEP_ALIVE_INTERVAL) {
+    lastKeepAlive = millis();
+
+    MqttMessage keepAliveMessage = MqttMessage(
+        getDeviceId(),
+        stateToString(LockSystemState::IDLE_KEEP_ALIVE),
+        sourceToString(ActionSource::SYSTEM)
+    );
+
+    mqtt_manager->publish(keepAliveMessage);
+
+    Serial.println("[System] Wysłano MQTT Keep-Alive.");
+}
 
     if (digitalRead(BUTTON) == LOW) {
         delay(50);

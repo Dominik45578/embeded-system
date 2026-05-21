@@ -16,9 +16,11 @@ public record LockLogRequest(
         @Size(min = 3, max = 64)
         @Pattern(regexp = "^[A-Za-z0-9_-]+$", message = "must contain only letters, numbers, underscores, or hyphens")
         String deviceId,
-        @NotBlank Instant timestamp,
+        @NotNull Instant timestamp,
         @NotBlank @Size(min = 1, max = 1024) String message,
-        @NotNull LockState lockState
+        @NotNull LockState lockState,
+
+        @NotBlank @Size(min = 4, max = 32) String source
 ) {
 
 }

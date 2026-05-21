@@ -4,12 +4,10 @@ namespace {
 static const char FACTORY_DEFAULT_JSON[] = R"json(
 {
   "wifi": {
-    "ssid": "",
+    "ssid": "iPhone (Dominik)",
     "password": ""
   },
   "ble": {
-    "service_uuid": "4fafc201-1fb5-459e-8fcc-c5c9c331914b",
-    "char_uuid": "beb5483e-36e1-4688-b7f5-ea07361b26a8",
     "pin": 123456,
     "enabled": true
   },
@@ -26,21 +24,20 @@ static const char FACTORY_DEFAULT_JSON[] = R"json(
     "auto_relock_ms": 5000
   },
   "mqtt": {
-    "broker": "",
-    "topic": "lock/default"
+    "broker": "broker.hivemq.com",
+    "topic": "lockly/device/logs"
   },
   "log": {
     "enabled": true,
     "level": "INFO"
+  },
+  "owner":{
+    "id": "".
+    "publicKey" : ""
   }
 }
 )json";
 }
-
-// ==========================================
-// AppConfig Implementation
-// ==========================================
-
 AppConfig::AppConfig() {
     loadFactoryDefaults();
 }

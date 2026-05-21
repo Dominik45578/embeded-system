@@ -18,7 +18,8 @@ enum class LockSystemState {
     CHANGING_PIN,
     UNLOCKED,
     BLOCKED_TEMP,
-    IDLE_STARTED
+    IDLE_STARTED,
+    IDLE_KEEP_ALIVE
 };
 
 enum class ActionResult {

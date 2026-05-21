@@ -21,7 +21,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4, // Podniesienie wersji bazy danych w celu wdrożenia migracji kolumny hardwareId
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE events (
@@ -34,6 +34,7 @@ class DatabaseService {
         await db.execute('''
           CREATE TABLE devices (
             id TEXT PRIMARY KEY,
+            hardwareId TEXT,
             name TEXT,
             isBlocked INTEGER,
             isConnected INTEGER
@@ -43,7 +44,7 @@ class DatabaseService {
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await db.execute('''
-            CREATE TABLE devices (
+            CREATE TABLE IF NOT EXISTS devices (
               id TEXT PRIMARY KEY,
               name TEXT,
               isBlocked INTEGER,
@@ -52,9 +53,15 @@ class DatabaseService {
           ''');
         }
         if (oldVersion < 3) {
-          await db.execute('ALTER TABLE devices ADD COLUMN name TEXT');
-          await db.execute('ALTER TABLE devices ADD COLUMN isBlocked INTEGER');
-          await db.execute('ALTER TABLE devices ADD COLUMN isConnected INTEGER');
+          try { await db.execute('ALTER TABLE devices ADD COLUMN name TEXT'); } catch (_) {}
+          try { await db.execute('ALTER TABLE devices ADD COLUMN isBlocked INTEGER'); } catch (_) {}
+          try { await db.execute('ALTER TABLE devices ADD COLUMN isConnected INTEGER'); } catch (_) {}
+        }
+        // Bezpieczna migracja do wersji 4 wprowadzająca niezależną kolumnę dla identyfikatora sprzętowego API/MQTT
+        if (oldVersion < 4) {
+          try {
+            await db.execute('ALTER TABLE devices ADD COLUMN hardwareId TEXT');
+          } catch (_) {}
         }
       },
     );
@@ -101,10 +108,11 @@ class DatabaseService {
     await db.insert(
       'devices',
       {
-        'id': device.id,
+        'id': device.id,                  // Fizyczny adres MAC potrzebny lokalnie do obsługi BLE reconnect
+        'hardwareId': device.hardwareId,  // Identyfikator odczytany z mikrokontrolera powiązany ze Spring/MQTT
         'name': device.name,
         'isBlocked': device.isBlocked ? 1 : 0,
-        'isConnected': 0, // Assume not connected when inserting
+        'isConnected': 0,                 // Domyślny status rozłączony podczas rejestracji struktury
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
@@ -125,6 +133,7 @@ class DatabaseService {
     return maps.map((map) {
       return Device(
         id: map['id'] as String,
+        hardwareId: map['hardwareId'] as String? ?? '', // Zwracanie sparsowanej wartości do nowej domeny modelu
         name: map['name'] as String? ?? '',
         isBlocked: (map['isBlocked'] as int? ?? 0) == 1,
       );

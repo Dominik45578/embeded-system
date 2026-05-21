@@ -8,7 +8,7 @@ MqttManager::MqttManager(const char* global_topic, const String& device_topic) :
 
     auto& config = ConfigOrchestrator::getInstance().getConfig();
     
-    this->mqtt_server_address = config.get<String>("mqtt.server", "broker.mqtt-dashboard.com");
+    this->mqtt_server_address = config.get<String>("mqtt.server", "broker.hivemq.com");
     uint32_t port = config.get<uint32_t>("mqtt.port", 1883);
 
     client.setServer(this->mqtt_server_address.c_str(), port);
@@ -96,6 +96,21 @@ void MqttManager::callback(char* topic, byte* payload, unsigned int length) {
             Serial.println("Podczas otwierania zamka przez WiFi wystapil blad");
         }
     }
+    else if(action != nullptr && strcmp(action, "CHECK_ALIVE") == 0){
+    Serial.println("Otrzymano żądanie CHECK_ALIVE");
+
+    publish(
+        MqttMessage(
+            device_topic,
+            "IDLE_KEEP_ALIVE",
+            "SYSTEM"
+        )
+    );
+
+    Serial.println("Wysłano odpowiedź KEEP_ALIVE");
+}
+
+    
   }
 }
 

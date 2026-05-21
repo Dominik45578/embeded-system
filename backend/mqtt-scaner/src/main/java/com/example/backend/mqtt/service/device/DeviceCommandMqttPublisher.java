@@ -5,7 +5,7 @@ import com.kowallo.spring.mqttwebstarter.annotation.MqttPublisher;
 import com.kowallo.spring.mqttwebstarter.annotation.MqttPublisherTopic;
 import com.kowallo.spring.mqttwebstarter.annotation.TopicVariable;
 
-@MqttPublisher("device/")
+@MqttPublisher("lockly/device/")
 public interface DeviceCommandMqttPublisher {
 
     /**

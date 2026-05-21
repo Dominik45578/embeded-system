@@ -2,14 +2,17 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/services/ble/ble_device_manger.dart';
+import '../../../core/services/ble/ble_lock_connection.dart';
+import '../../../core/services/iot_device_service.dart';
 
 class DeviceScannerModal extends StatefulWidget {
   const DeviceScannerModal({super.key});
 
-  static void show(BuildContext context) {
-    showModalBottomSheet(
+  static Future<bool?> show(BuildContext context) {
+    return showModalBottomSheet<bool>(
       context: context,
       backgroundColor: const Color(0xFF1E1E1E),
       isScrollControlled: true,
@@ -31,6 +34,9 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
   List<BluetoothDevice> _connectedDevices = [];
   List<BluetoothDevice> _bondedDevices = []; // Sparowane w systemie
   final BleDeviceManager _manager = BleDeviceManager();
+  late final IotDeviceService _iotDeviceService;
+  String? _addingDeviceId;
+  String? _addStatusMessage;
 
   StreamSubscription<BluetoothAdapterState>? _adapterStateSubscription;
   StreamSubscription<bool>? _isScanningSubscription;
@@ -39,6 +45,7 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
   @override
   void initState() {
     super.initState();
+    _iotDeviceService = Provider.of<IotDeviceService>(context, listen: false);
     _initBluetoothLifecycle();
   }
 
@@ -121,6 +128,76 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
     );
   }
 
+  Future<void> _addDevice(BluetoothDevice device) async {
+    final macAddress = device.remoteId.str; // Adres MAC używany tylko lokalnie dla BLE
+    final deviceName = device.platformName.isNotEmpty ? device.platformName : 'Zamek';
+
+    if (_addingDeviceId != null) return;
+
+    setState(() {
+      _addingDeviceId = macAddress;
+      _addStatusMessage = 'Łączenie z urządzeniem przez Bluetooth...';
+    });
+
+    BleLockConnection? temporaryConnection;
+
+    try {
+      await FlutterBluePlus.stopScan();
+
+      temporaryConnection = BleLockConnection(device);
+      await temporaryConnection.connect();
+      await temporaryConnection.discoverServicesAndSetup();
+
+      if (!mounted) return;
+      setState(() {
+        _addStatusMessage = 'Odczytywanie identyfikatora sprzętowego (FF30)...';
+      });
+
+      final String hardwareDeviceId = await temporaryConnection.readDeviceId();
+      debugPrint('[BLE Discovery] Pomyślnie odczytano Hardware Device ID: $hardwareDeviceId');
+
+      if (hardwareDeviceId.isEmpty) {
+        throw Exception('Odczytany identyfikator sprzętowy urządzenia jest pusty.');
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _addStatusMessage = 'Rejestrowanie urządzenia w chmurze...';
+      });
+
+      await _iotDeviceService.addDevice(deviceId: hardwareDeviceId, deviceName: deviceName);
+
+      if (!mounted) return;
+      setState(() => _addStatusMessage = 'Zapisywanie lokalnie i laczenie przez Bluetooth...');
+
+      await temporaryConnection.disconnect();
+      temporaryConnection = null;
+
+      // Przekazujemy obiekt oraz odczytane wcześniej hardwareDeviceId
+      await _manager.saveAndConnectDevice(device, hardwareDeviceId);
+
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (temporaryConnection != null) {
+        try {
+          await temporaryConnection.disconnect();
+        } catch (_) {}
+      }
+
+      await _manager.forgetDevice(macAddress);
+
+      if (mounted) {
+        setState(() {
+          _addingDeviceId = null;
+          _addStatusMessage = null;
+        });
+        _showSnackBar('Nie udało się dodać urządzenia: $e');
+      }
+    }
+  }
+
   @override
   void dispose() {
     _adapterStateSubscription?.cancel();
@@ -172,6 +249,26 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
               ),
             ),
           const SizedBox(height: 8),
+          if (_addStatusMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00ADB5)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _addStatusMessage!,
+                      style: const TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Expanded(child: modalContent),
         ],
       ),
@@ -261,8 +358,8 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
     final bondedIds = _bondedDevices.map((d) => d.remoteId.str).toSet();
 
     final discoveredResults = _scanResults
-        .where((result) => 
-            !connectedIds.contains(result.device.remoteId.str) && 
+        .where((result) =>
+            !connectedIds.contains(result.device.remoteId.str) &&
             !bondedIds.contains(result.device.remoteId.str))
         .toList();
 
@@ -357,12 +454,10 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           elevation: 0,
         ),
-        onPressed: () async {
-          FlutterBluePlus.stopScan();
-          await _manager.saveAndConnectDevice(device);
-          if (mounted) Navigator.pop(context);
-        },
-        child: const Text('Dodaj', style: TextStyle(fontWeight: FontWeight.bold)),
+        onPressed: _addingDeviceId == null ? () => _addDevice(device) : null,
+        child: _addingDeviceId == device.remoteId.str
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : const Text('Dodaj', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }
@@ -386,12 +481,10 @@ class _DeviceScannerModalState extends State<DeviceScannerModal> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           elevation: 0,
         ),
-        onPressed: () async {
-          FlutterBluePlus.stopScan();
-          await _manager.saveAndConnectDevice(device);
-          if (mounted) Navigator.pop(context);
-        },
-        child: const Text('Dodaj', style: TextStyle(fontWeight: FontWeight.bold)),
+        onPressed: _addingDeviceId == null ? () => _addDevice(device) : null,
+        child: _addingDeviceId == device.remoteId.str
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : const Text('Dodaj', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }

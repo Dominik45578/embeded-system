@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include "BleManager.hpp"
+#include "ConfigManager.hpp"
 
 class BleConfigController {
 public:
@@ -34,9 +35,9 @@ private:
     void handleMqttWrite(const String& payload);
     void handleConfigStateWrite(uint8_t stateByte);
 
-    // Metody pomocnicze logiki biznesowej i synchronizacji z ConfigOrchestrator
     void loadAndPublishCurrentConfig();
     void saveAndApplyWifi();
     void saveAndApplyMqtt();
     void executeDeviceReboot();
+    void publishConfigJson(const AppConfig& config) ;
 };

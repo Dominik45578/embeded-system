@@ -22,6 +22,7 @@ class RabbitNotificationPublisher implements NotificationPublisher {
         var payload = new StateChangeNotification(
                 device.getDeviceId(),
                 device.getUser().getFirebaseId(),
+                device.getUser().getFcmToken(),
                 lockState,
                 Instant.now()
         );
@@ -39,6 +40,7 @@ class RabbitNotificationPublisher implements NotificationPublisher {
     public record StateChangeNotification(
             String deviceId,
             String userFirebaseId,
+            String fcmToken,
             LockState lockState,
             Instant timestamp
     ) {}

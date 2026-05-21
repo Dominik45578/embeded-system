@@ -15,8 +15,11 @@ public class FirebasePushNotificationService implements PushNotificationService 
 
     @Override
     public void sendLockStateNotification(StateChangeNotification notification) {
-        //placeholder - muszę dodać kilka rzeczy
-        String userTopic = "user_" + notification.userFirebaseId();
+        String token = notification.fcmToken();
+        if (token == null || token.isBlank()) {
+            log.warn("FCM token is missing for user: {}", notification.userFirebaseId());
+            return;
+        }
 
         Notification push = Notification.builder()
                 .setTitle("Status zamka zmieniony")
@@ -24,7 +27,7 @@ public class FirebasePushNotificationService implements PushNotificationService 
                 .build();
 
         Message message = Message.builder()
-                .setTopic(userTopic)
+                .setToken(token)
                 .setNotification(push)
                 .putData("deviceId", notification.deviceId())
                 .putData("timestamp", notification.timestamp().toString())

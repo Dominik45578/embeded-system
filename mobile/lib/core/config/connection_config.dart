@@ -13,7 +13,7 @@ class ConnectionConfig {
   const ConnectionConfig({
     this.mode = ConnectionMode.local,
     this.protocol = HttpProtocol.http,
-    this.host = 'localhost',
+    this.host = '100.99.243.73',
     this.identityPort = 12100,
     this.iotPort = 12200,
     this.serverIdentityUrl = '',

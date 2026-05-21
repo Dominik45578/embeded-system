@@ -4,7 +4,8 @@ import '../config/connection_config.dart';
 
 class ConnectionConfigService extends ChangeNotifier {
   ConnectionConfigService._internal();
-  static final ConnectionConfigService instance = ConnectionConfigService._internal();
+  static final ConnectionConfigService instance =
+      ConnectionConfigService._internal();
 
   static const String _keyMode = 'net_mode';
   static const String _keyProtocol = 'net_protocol';
@@ -31,19 +32,19 @@ class ConnectionConfigService extends ChangeNotifier {
 
     if (modeRaw != null) {
       final mode = ConnectionMode.values.firstWhere(
-            (e) => e.name == modeRaw,
+        (e) => e.name == modeRaw,
         orElse: () => ConnectionMode.local,
       );
 
       final protocol = HttpProtocol.values.firstWhere(
-            (e) => e.name == protocolRaw,
+        (e) => e.name == protocolRaw,
         orElse: () => HttpProtocol.http,
       );
 
       _config = ConnectionConfig(
         mode: mode,
         protocol: protocol,
-        host: host ?? 'localhost',
+        host: host ?? '100.99.243.73',
         identityPort: identityPort ?? 12100,
         iotPort: iotPort ?? 12200,
         serverIdentityUrl: serverIdentityUrl ?? '',

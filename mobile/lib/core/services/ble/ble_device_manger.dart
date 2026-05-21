@@ -11,184 +11,255 @@ import 'ble_lock_connection.dart';
 
 class BleDeviceManager extends ChangeNotifier {
   static final BleDeviceManager _instance = BleDeviceManager._internal();
+
   factory BleDeviceManager() => _instance;
-  BleDeviceManager._internal();
 
+  BleDeviceManager._internal() {
+    _initBluetoothStateListener();
+    init();
+  }
+
+  static const int _eventsPageSize = 20;
+
+  final Map<String, BleLockConnection> _connections = {};
+  final Map<String, StreamSubscription<BluetoothConnectionState>> _connectionStateSubscriptions = {};
+  final Map<String, StreamSubscription<String>> _lockStateSubscriptions = {};
+  StreamSubscription<List<ScanResult>>? _scanSubscription;
+  StreamSubscription<BluetoothAdapterState>? _adapterStateSubscription;
+
+  final StreamController<List<ScanResult>> _scanResultsController = StreamController.broadcast();
+  Stream<List<ScanResult>> get scanResults => _scanResultsController.stream;
+
+  final List<Device> _savedDevices = [];
   final List<DeviceEvent> _events = [];
-  List<DeviceEvent> get events => List.unmodifiable(_events);
-
+  int _eventsOffset = 0;
   bool _hasMoreEvents = true;
+  bool _isInitialized = false;
+
+  bool isScanning = false;
+
+  List<Device> get savedDevices => List.unmodifiable(_savedDevices);
+  List<DeviceEvent> get events => List.unmodifiable(_events);
   bool get hasMoreEvents => _hasMoreEvents;
 
-  final DatabaseService _dbService = DatabaseService.instance;
-  final Map<String, StreamSubscription> _streamSubscriptions = {};
-
-  final Map<String, BleLockConnection> _activeConnections = {};
-  
-  List<Device> _savedDevices = [];
-
-  List<Device> get savedDevices => _savedDevices;
-
   Future<void> init() async {
-    _savedDevices = await _dbService.getSavedDevices();
+    if (_isInitialized) {
+      await _loadSavedDevices();
+      return;
+    }
+
+    _isInitialized = true;
+    await _loadSavedDevices();
     await fetchNextEventsPage(isRefresh: true);
     await reconnectToSavedDevices();
-    notifyListeners();
   }
 
   Future<void> reconnectToSavedDevices() async {
-    // 1. Sprawdź, które urządzenia są już połączone na poziomie systemu
-    List<BluetoothDevice> systemConnectedDevices = FlutterBluePlus.connectedDevices;
-    
+    final systemConnectedDevices = FlutterBluePlus.connectedDevices;
+
     for (final device in _savedDevices) {
       if (isConnected(device.id)) continue;
 
       try {
-        final bleDevice = BluetoothDevice.fromId(device.id);
-        
-        // 2. Jeśli urządzenie jest na liście systemowych połączeń, pomiń fizyczne nawiązywanie połączenia
-        bool isAlreadySystemConnected = systemConnectedDevices.any((d) => d.remoteId.str == device.id);
-        
+        final isAlreadySystemConnected = systemConnectedDevices.any((bleDevice) => bleDevice.remoteId.str == device.id);
+
         if (isAlreadySystemConnected) {
-          debugPrint('Urządzenie ${device.id} jest już połączone systemowo. Przejmowanie połączenia...');
-          await _setupExistingConnection(bleDevice);
+          final bluetoothDevice = systemConnectedDevices.firstWhere((bleDevice) => bleDevice.remoteId.str == device.id);
+          await _setupExistingConnection(bluetoothDevice);
         } else {
-          debugPrint('Próba nowego połączenia z ${device.id}...');
-          // Ustawiamy krótki timeout, aby uniknąć blokowania UI na długo
-          await connectToDevice(bleDevice).timeout(const Duration(seconds: 10));
+          await connectToDevice(device.id).timeout(const Duration(seconds: 10));
         }
       } catch (e) {
-        debugPrint('Nie udało się automatycznie połączyć/zainicjować ${device.id}: $e');
-        await _dbService.updateDeviceConnectionState(device.id, false);
+        debugPrint('[BleDeviceManager] Nie udalo sie automatycznie polaczyc z ${device.id}: $e');
+        await DatabaseService.instance.updateDeviceConnectionState(device.id, false);
       }
     }
+
     notifyListeners();
   }
 
-  // Ustawia połączenie dla urządzenia, z którym telefon jest już połączony na poziomie OS
-  Future<BleLockConnection> _setupExistingConnection(BluetoothDevice device) async {
+  Future<void> _setupExistingConnection(BluetoothDevice device) async {
     final deviceId = device.remoteId.str;
-    
-    final connection = BleLockConnection(device);
-    // POMIJAMY connection.connect() ponieważ wystąpiłby GATT_INVALID_HANDLE
-    await connection.discoverServicesAndSetup(); 
-    
-    await _registerConnection(deviceId, connection);
-    return connection;
-  }
-
-  Future<void> saveAndConnectDevice(BluetoothDevice device) async {
-    final deviceId = device.remoteId.str;
-
-    if (!_savedDevices.any((d) => d.id == deviceId)) {
-      final newDevice = Device(id: deviceId, name: device.platformName, isBlocked: false);
-      _savedDevices.add(newDevice);
-      await _dbService.insertDevice(newDevice);
-    }
-
-    await connectToDevice(device);
-    notifyListeners();
-  }
-
-  Future<void> forgetDevice(String deviceId) async {
-    await disconnectDevice(deviceId);
-    _savedDevices.removeWhere((d) => d.id == deviceId);
-    await _dbService.deleteDevice(deviceId);
-    notifyListeners();
-  }
-
-  Future<BleLockConnection> connectToDevice(BluetoothDevice device) async {
-    final deviceId = device.remoteId.str;
-
-    if (_activeConnections.containsKey(deviceId)) {
-      return _activeConnections[deviceId]!;
-    }
+    if (_connections.containsKey(deviceId)) return;
 
     final connection = BleLockConnection(device);
-    await connection.connect();
     await connection.discoverServicesAndSetup();
-
     await _registerConnection(deviceId, connection);
-    return connection;
   }
-  
-  Future<void> _registerConnection(String deviceId, BleLockConnection connection) async {
-    await _dbService.updateDeviceConnectionState(deviceId, true);
-    _activeConnections[deviceId] = connection;
 
-    _streamSubscriptions[deviceId] = connection.lockStateStream.listen((rawMessage) {
-      logEvent(rawMessage, EventSource.bluetooth);
+  void _initBluetoothStateListener() {
+    _adapterStateSubscription = FlutterBluePlus.adapterState.listen((state) {
+      if (state == BluetoothAdapterState.on) {
+        startScan();
+      } else {
+        stopScan();
+      }
     });
-    
-    // Nasłuchiwanie rozłączeń z zewnątrz
-    connection.connectionStateStream.listen((state) {
-        if(state == BluetoothConnectionState.disconnected) {
-            debugPrint('Urządzenie $deviceId zostało rozłączone.');
-            _handleDeviceDisconnected(deviceId);
-        }
+  }
+
+  void startScan() {
+    if (isScanning) return;
+    isScanning = true;
+    notifyListeners();
+
+    _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
+      _scanResultsController.add(results);
     });
 
+    FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+    Future.delayed(const Duration(seconds: 10), stopScan);
+  }
+
+  Future<void> stopScan() async {
+    isScanning = false;
+    await FlutterBluePlus.stopScan();
+    await _scanSubscription?.cancel();
     notifyListeners();
   }
 
-  Future<void> disconnectDevice(String deviceId) async {
-    final connection = _activeConnections[deviceId];
-    if (connection != null) {
-      await connection.disconnect();
-      _handleDeviceDisconnected(deviceId);
-    }
-  }
-  
-  void _handleDeviceDisconnected(String deviceId) {
-      _activeConnections.remove(deviceId);
-      _streamSubscriptions[deviceId]?.cancel();
-      _streamSubscriptions.remove(deviceId);
-      _dbService.updateDeviceConnectionState(deviceId, false);
-      notifyListeners();
-  }
-
-  BleLockConnection? getConnection(String deviceId) => _activeConnections[deviceId];
-
-  bool isConnected(String deviceId) => _activeConnections.containsKey(deviceId);
-
-  Future<void> setLockCommand(String deviceId, LockCommand command) async {
-    final connection = getConnection(deviceId);
-    if (connection != null) {
-      await connection.sendCommand(command);
-    } else {
-      throw Exception('Urządzenie $deviceId nie jest połączone.');
-    }
+  Future<void> _loadSavedDevices() async {
+    final devices = await DatabaseService.instance.getSavedDevices();
+    _savedDevices
+      ..clear()
+      ..addAll(devices);
+    notifyListeners();
   }
 
   Future<void> fetchNextEventsPage({bool isRefresh = false}) async {
     if (isRefresh) {
-      _events.clear();
+      _eventsOffset = 0;
       _hasMoreEvents = true;
+      _events.clear();
     }
 
     if (!_hasMoreEvents) return;
 
-    final int currentOffset = _events.length;
-    final List<DeviceEvent> newPage = await _dbService.getPagedEvents(20, currentOffset);
+    final nextPage = await DatabaseService.instance.getPagedEvents(_eventsPageSize, _eventsOffset);
+    _events.addAll(nextPage);
+    _eventsOffset += nextPage.length;
+    _hasMoreEvents = nextPage.length == _eventsPageSize;
+    notifyListeners();
+  }
 
-    if (newPage.length < 20) {
-      _hasMoreEvents = false;
+  Future<void> saveAndConnectDevice(BluetoothDevice bluetoothDevice, String hardwareId) async {
+    final device = Device(
+      id: bluetoothDevice.remoteId.str, // Adres MAC jako kotwica BLE
+      hardwareId: hardwareId,           // Hardware ID jako kotwica API
+      name: bluetoothDevice.platformName.isNotEmpty ? bluetoothDevice.platformName : 'Zamek',
+      isBlocked: false,
+    );
+
+    await DatabaseService.instance.insertDevice(device);
+    await _loadSavedDevices();
+    await connectToDevice(device.id); // Reconnect poprawnie użyje adresu MAC
+  }
+
+  Future<void> connectToDevice(String deviceId) async {
+    if (_connections.containsKey(deviceId)) return;
+
+    final device = BluetoothDevice.fromId(deviceId);
+    final connection = BleLockConnection(device);
+
+    try {
+      await connection.connect();
+      await connection.discoverServicesAndSetup();
+      await _registerConnection(deviceId, connection);
+    } catch (e) {
+      debugPrint('[BleDeviceManager] Blad polaczenia z $deviceId: $e');
+      rethrow;
     }
+  }
 
-    _events.addAll(newPage);
+  Future<void> _registerConnection(String deviceId, BleLockConnection connection) async {
+    _connections[deviceId] = connection;
+    await DatabaseService.instance.updateDeviceConnectionState(deviceId, true);
+
+    await _connectionStateSubscriptions[deviceId]?.cancel();
+    _connectionStateSubscriptions[deviceId] = connection.connectionStateStream.listen((state) async {
+      if (state == BluetoothConnectionState.disconnected) {
+        await _handleDeviceDisconnected(deviceId);
+      }
+    });
+
+    await _lockStateSubscriptions[deviceId]?.cancel();
+    _lockStateSubscriptions[deviceId] = connection.lockStateStream.listen((message) {
+      logEvent(message, EventSource.bluetooth);
+    });
+
     notifyListeners();
   }
 
   Future<void> logEvent(String message, EventSource source) async {
-    final newEvent = DeviceEvent(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+    final timestamp = DateTime.now();
+    final event = DeviceEvent(
+      id: timestamp.microsecondsSinceEpoch.toString(),
       message: message,
-      timestamp: DateTime.now(),
+      timestamp: timestamp,
       source: source,
     );
 
-    await _dbService.insertEvent(newEvent);
-    _events.insert(0, newEvent);
+    await DatabaseService.instance.insertEvent(event);
+    _events.insert(0, event);
+    _eventsOffset++;
     notifyListeners();
+  }
+
+  Future<void> setLockCommand(String deviceId, LockCommand command) async {
+    final connection = getConnection(deviceId);
+    if (connection == null) {
+      throw Exception('Urzadzenie $deviceId nie jest polaczone.');
+    }
+
+    await connection.sendCommand(command);
+  }
+
+  Future<void> disconnectFromDevice(String deviceId) async {
+    final connection = _connections[deviceId];
+    if (connection != null) {
+      await connection.disconnect();
+      await _handleDeviceDisconnected(deviceId);
+    }
+  }
+
+  Future<void> disconnectDevice(String deviceId) => disconnectFromDevice(deviceId);
+
+  Future<void> _handleDeviceDisconnected(String deviceId) async {
+    _connections.remove(deviceId);
+    await _connectionStateSubscriptions.remove(deviceId)?.cancel();
+    await _lockStateSubscriptions.remove(deviceId)?.cancel();
+    await DatabaseService.instance.updateDeviceConnectionState(deviceId, false);
+    notifyListeners();
+  }
+
+  Future<void> forgetDevice(String deviceId) async {
+    await disconnectFromDevice(deviceId);
+    await DatabaseService.instance.deleteDevice(deviceId);
+    _savedDevices.removeWhere((device) => device.id == deviceId);
+    notifyListeners();
+  }
+
+  BleLockConnection? getConnection(String deviceId) {
+    return _connections[deviceId];
+  }
+
+  bool isConnected(String deviceId) {
+    return _connections.containsKey(deviceId);
+  }
+
+  @override
+  void dispose() {
+    stopScan();
+    _scanResultsController.close();
+    _adapterStateSubscription?.cancel();
+    for (final subscription in _connectionStateSubscriptions.values) {
+      subscription.cancel();
+    }
+    for (final subscription in _lockStateSubscriptions.values) {
+      subscription.cancel();
+    }
+    for (final connection in _connections.values) {
+      connection.disconnect();
+    }
+    super.dispose();
   }
 }
