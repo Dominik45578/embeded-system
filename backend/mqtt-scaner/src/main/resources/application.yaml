@@ -9,7 +9,7 @@ spring:
 
     # username: ${BACKEND_MQTT_USERNAME}
     # password: ${BACKEND_MQTT_PASSWORD}
-    clean-session: ${BACKEND_MQTT_CLEAN_SESSION:false}
+    clean-session: ${BACKEND_MQTT_CLEAN_SESSION:true}
     connection-timeout: ${BACKEND_MQTT_CONNECTION_TIMEOUT:15}
     keep-alive-interval: ${BACKEND_MQTT_KEEP_ALIVE_INTERVAL:30}
     automatic-reconnect: ${BACKEND_MQTT_AUTOMATIC_RECONNECT:true}

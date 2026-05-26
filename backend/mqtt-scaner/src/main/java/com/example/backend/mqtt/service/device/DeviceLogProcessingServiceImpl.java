@@ -40,7 +40,7 @@ public class DeviceLogProcessingServiceImpl implements DeviceLogProcessingServic
                         return;
                     }
                     notificationPublisher.notifyStateChange(device, request.lockState());
-                    saveToInflux(request);
+                    //saveToInflux(request);
                 },
                 () -> log.warn("Device {} not found in DB. Request rejected.", request.deviceId())
         );

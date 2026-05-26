@@ -70,49 +70,50 @@ void MqttManager::reconnect() {
 }
 
 void MqttManager::callback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-  Serial.println();
+    Serial.print("Message arrived [");
+    Serial.print(topic);
+    Serial.print("] ");
+    for (int i = 0; i < length; i++) {
+        Serial.print((char)payload[i]);
+    }
+    Serial.println();
 
-  if(strcmp(topic, device_topic.c_str()) == 0){
-    JsonDocument incomingDoc;
-    deserializeJson(incomingDoc, payload);
-    
-    const char* action = incomingDoc["command"];
+    if (strcmp(topic, device_topic.c_str()) == 0) {
+        JsonDocument incomingDoc;
+        deserializeJson(incomingDoc, payload);
+        
+        const char* action = incomingDoc["command"];
 
-    if(action != nullptr && strcmp(action, "UNLOCK") == 0){
-        Serial.println("Otrzymano prosbe o zdalne otwarcie zamkna (WiFi)");
-        ActionResult res = LockController::getInstance().forceUnlock(ActionSource::WIFI);
+        if (action != nullptr && strcmp(action, "UNLOCK") == 0) {
+            Serial.println("Otrzymano prosbe o zdalne otwarcie zamkna (WiFi)");
+            ActionResult res = LockController::getInstance().forceUnlock(ActionSource::WIFI);
 
-        if(res == ActionResult::SUCCESS){
-            Serial.println("Otwarto zamek zdalnie przez WiFi");
-            publish(MqttMessage(device_topic, "UNLOCKED", "WIFI"));
+            if (res == ActionResult::SUCCESS) {
+                Serial.println("Otwarto zamek zdalnie przez WiFi");
+                publish(MqttMessage(device_topic, "UNLOCKED", "WIFI"));
+            }
+            else {
+                Serial.println("Podczas otwierania zamka przez WiFi wystapil blad");
+            }
         }
-        else {
-            Serial.println("Podczas otwierania zamka przez WiFi wystapil blad");
+        else if (action != nullptr && strcmp(action, "CHECK_ALIVE") == 0) {
+            Serial.println("Otrzymano żądanie CHECK_ALIVE");
+
+            publish(
+                MqttMessage(
+                    device_topic,
+                    "IDLE_KEEP_ALIVE",
+                    "SYSTEM"
+                )
+            );
+
+            Serial.println("Wysłano odpowiedź KEEP_ALIVE");
+        }
+        else if (action != nullptr && strcmp(action, "LOCK") == 0) {
+            LockController::getInstance().attemptLock(ActionSource::WIFI);
         }
     }
-    else if(action != nullptr && strcmp(action, "CHECK_ALIVE") == 0){
-    Serial.println("Otrzymano żądanie CHECK_ALIVE");
-
-    publish(
-        MqttMessage(
-            device_topic,
-            "IDLE_KEEP_ALIVE",
-            "SYSTEM"
-        )
-    );
-
-    Serial.println("Wysłano odpowiedź KEEP_ALIVE");
-}
-
-    
-  }
-}
+} // <--- TUTAJ brakowało tej klamry, która zamyka metodę callback
 
 void MqttManager::loop() {
     if (WiFi.status() != WL_CONNECTED) {
@@ -135,7 +136,6 @@ void MqttManager::publish(const MqttMessage message) {
     if (!client.connected()) {
         reconnect();
     }
-
 
     doc.clear();
     doc["deviceId"] = message.getDeviceId();

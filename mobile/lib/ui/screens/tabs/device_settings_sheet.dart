@@ -574,7 +574,7 @@ class _DeviceSettingsSheetState extends State<DeviceSettingsSheet> {
                 onPressed: _isActionLoading || _iotDevice!.isBlocked ? null : () => _sendWifiCommand("UNLOCK"),
                 icon: const Icon(Icons.lock_open),
                 label: const Text('Otwórz'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey[700]),
               ),
             ),
             const SizedBox(width: 16),
@@ -583,27 +583,7 @@ class _DeviceSettingsSheetState extends State<DeviceSettingsSheet> {
                 onPressed: _isActionLoading || _iotDevice!.isBlocked ? null : () => _sendWifiCommand("LOCK"),
                 icon: const Icon(Icons.lock),
                 label: const Text('Zamknij'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _isCheckingStatus ? null : _checkAliveStatus,
-                icon: _isCheckingStatus ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.wifi_tethering),
-                label: const Text('Sprawdź status MQTT'),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _isActionLoading ? null : _toggleBlock,
-                icon: Icon(_iotDevice!.isBlocked ? Icons.check_circle : Icons.block, color: _iotDevice!.isBlocked ? Colors.green : Colors.red),
-                label: Text(_iotDevice!.isBlocked ? 'Odblokuj' : 'Zablokuj', style: TextStyle(color: _iotDevice!.isBlocked ? Colors.green : Colors.red)),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[700]),
               ),
             ),
           ],
@@ -917,7 +897,7 @@ class _DeviceSettingsSheetState extends State<DeviceSettingsSheet> {
         suffixIcon: suffixIcon,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00ADB5))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: const Color(0xFF00ADB5))),
         errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent)),
         focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 2)),
       ),

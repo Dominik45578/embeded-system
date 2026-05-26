@@ -1,3 +1,4 @@
+
 #include <Arduino.h>
 #include "setup.hpp"
 #include "LedcSerwoManager.hpp"
@@ -21,9 +22,12 @@ BleConnectionController* ble_connection_controller;
 BleConfigController* ble_config_controller;
 LockSystemState lastSystemState = LockSystemState::IDLE_STARTED;
 
-
 unsigned long lastKeepAlive = 0;
 const unsigned long KEEP_ALIVE_INTERVAL = 300000;
+
+unsigned long lastGreenLedTime = 0;
+bool greenTimerActive = false;
+
 void resetLeds() {
     digitalWrite(RED_LED, LOW);
     digitalWrite(GREEN_LED, LOW);
@@ -39,7 +43,6 @@ String sourceToString(ActionSource source) {
         default: return "NONE";
     }
 }
-
 
 String stateToString(LockSystemState state) {
     switch (state) {
@@ -76,7 +79,6 @@ void setup() {
 
     keypad_controller = new KeypadLockController(keypad);
 
-
     Serial.print("DeviceId: "); Serial.println(getDeviceId());
 
     mqtt_manager = new MqttManager(GLOBAL_TOPIC, "lockly/device/"+getDeviceId());
@@ -112,35 +114,54 @@ void loop() {
     ActionSource currentSource = LockController::getInstance().getLastActionSource();
     
     if (currentState != lastSystemState) {
-        resetLeds(); 
-        
         String sourceStr = sourceToString(currentSource);
-
         MqttMessage mqttMessage = MqttMessage(getDeviceId(), stateToString(currentState), sourceStr);
         mqtt_manager->publish(mqttMessage);
         
+        if (currentState == LockSystemState::UNLOCKED) {
+            resetLeds();
+            digitalWrite(GREEN_LED, HIGH);
+            lastGreenLedTime = millis();
+            greenTimerActive = true;
+        } else if (currentState == LockSystemState::ENTERING_PIN) {
+            greenTimerActive = false;
+            resetLeds();
+            digitalWrite(BLUE_LED, HIGH);
+        } else if (currentState == LockSystemState::BLOCKED_TEMP) {
+            greenTimerActive = false;
+            resetLeds();
+            digitalWrite(RED_LED, HIGH);
+        } else {
+            if (!greenTimerActive) {
+                resetLeds();
+            }
+        }
+        
         lastSystemState = currentState;
     }
+
+    if (greenTimerActive && (millis() - lastGreenLedTime >= 10000)) {
+        greenTimerActive = false;
+        resetLeds();
+        LockSystemState s = LockController::getInstance().getCurrentState();
+        if (s == LockSystemState::ENTERING_PIN) {
+            digitalWrite(BLUE_LED, HIGH);
+        } else if (s == LockSystemState::BLOCKED_TEMP) {
+            digitalWrite(RED_LED, HIGH);
+        }
+    }
+
     if (millis() - lastKeepAlive >= KEEP_ALIVE_INTERVAL) {
-    lastKeepAlive = millis();
-
-    MqttMessage keepAliveMessage = MqttMessage(
-        getDeviceId(),
-        stateToString(LockSystemState::IDLE_KEEP_ALIVE),
-        sourceToString(ActionSource::SYSTEM)
-    );
-
-    mqtt_manager->publish(keepAliveMessage);
-
-    Serial.println("[System] Wysłano MQTT Keep-Alive.");
-}
+        lastKeepAlive = millis();
+        MqttMessage keepAliveMessage = MqttMessage(getDeviceId(), stateToString(LockSystemState::IDLE_KEEP_ALIVE), sourceToString(ActionSource::SYSTEM));
+        mqtt_manager->publish(keepAliveMessage);
+        Serial.println("[System] Wysłano MQTT Keep-Alive.");
+    }
 
     if (digitalRead(BUTTON) == LOW) {
         delay(50);
         if (digitalRead(BUTTON) == LOW) {
-            
             ble_app_controller->startPairingMode();
-            
             resetLeds();
             digitalWrite(BLUE_LED, HIGH);
             delay(200);
@@ -149,9 +170,7 @@ void loop() {
             digitalWrite(BLUE_LED, HIGH);
             delay(200);
             digitalWrite(BLUE_LED, LOW);
-            
             while(digitalRead(BUTTON) == LOW) { delay(10); } 
-            
             lastSystemState = LockSystemState::BLOCKED_TEMP;
         }
     }
