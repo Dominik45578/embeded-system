@@ -1,0 +1,521 @@
+[
+    {
+        "id": "b9e33d6c9e5b177b",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "911898538a788a63",
+        "type": "mqtt-broker",
+        "name": "HIVE",
+        "broker": "broker.hivemq.com",
+        "port": "1883",
+        "tls": "0644b8bea3e5969b",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "4be87b655011e442",
+        "type": "influxdb",
+        "hostname": "127.0.0.1",
+        "port": 8086,
+        "protocol": "http",
+        "database": "database",
+        "name": "",
+        "usetls": false,
+        "tls": "",
+        "influxdbVersion": "2.0",
+        "url": "http://localhost:8181",
+        "timeout": 10,
+        "rejectUnauthorized": true
+    },
+    {
+        "id": "af335f0cd0d95288",
+        "type": "ui-base",
+        "name": "My Dashboard",
+        "path": "/dashboard",
+        "appIcon": "",
+        "includeClientData": true,
+        "acceptsClientConfig": [
+            "ui-notification",
+            "ui-control"
+        ],
+        "showPathInSidebar": false,
+        "headerContent": "page",
+        "navigationStyle": "default",
+        "titleBarStyle": "default",
+        "showReconnectNotification": true,
+        "notificationDisplayTime": 1,
+        "showDisconnectNotification": true,
+        "allowInstall": false
+    },
+    {
+        "id": "2b76d10d688d7b10",
+        "type": "ui-theme",
+        "name": "Default Theme",
+        "colors": {
+            "surface": "#ffffff",
+            "primary": "#0094CE",
+            "bgPage": "#eeeeee",
+            "groupBg": "#ffffff",
+            "groupOutline": "#cccccc"
+        },
+        "sizes": {
+            "density": "default",
+            "pagePadding": "12px",
+            "groupGap": "12px",
+            "groupBorderRadius": "4px",
+            "widgetGap": "12px"
+        }
+    },
+    {
+        "id": "0a839060f56418e2",
+        "type": "ui-page",
+        "name": "Page 1",
+        "ui": "af335f0cd0d95288",
+        "path": "/page1",
+        "icon": "home",
+        "layout": "grid",
+        "theme": "2b76d10d688d7b10",
+        "breakpoints": [
+            {
+                "name": "Default",
+                "px": 0,
+                "cols": 3
+            },
+            {
+                "name": "Tablet",
+                "px": 576,
+                "cols": 6
+            },
+            {
+                "name": "Small Desktop",
+                "px": 768,
+                "cols": 9
+            },
+            {
+                "name": "Desktop",
+                "px": 1024,
+                "cols": 12
+            }
+        ],
+        "order": 1,
+        "className": "",
+        "visible": true,
+        "disabled": "false"
+    },
+    {
+        "id": "4212302e5d0bee0d",
+        "type": "ui-group",
+        "name": "Group 1",
+        "page": "0a839060f56418e2",
+        "width": 6,
+        "height": 1,
+        "order": 1,
+        "showTitle": true,
+        "className": "",
+        "visible": false,
+        "disabled": false,
+        "groupType": "default"
+    },
+    {
+        "id": "50388101a75c4b22",
+        "type": "ui-group",
+        "name": "Wykresy",
+        "page": "0a839060f56418e2",
+        "width": 6,
+        "height": 1,
+        "order": 2,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "0644b8bea3e5969b",
+        "type": "tls-config",
+        "name": "",
+        "cert": "",
+        "key": "",
+        "ca": "",
+        "certname": "",
+        "keyname": "",
+        "caname": "",
+        "servername": "",
+        "verifyservercert": true,
+        "alpnprotocol": ""
+    },
+    {
+        "id": "4bce5d13dd5cbc8f",
+        "type": "mqtt in",
+        "z": "b9e33d6c9e5b177b",
+        "name": "",
+        "topic": "lockly/logs",
+        "qos": "0",
+        "datatype": "auto-detect",
+        "broker": "911898538a788a63",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 400,
+        "y": 140,
+        "wires": [
+            [
+                "93630bd853cde0ca",
+                "12df8c778318fea9"
+            ]
+        ]
+    },
+    {
+        "id": "93630bd853cde0ca",
+        "type": "function",
+        "z": "b9e33d6c9e5b177b",
+        "name": "function 1",
+        "func": "let json = msg.payload;\n\nif (json.lockState !== \"IDLE_KEEP_ALIVE\") {\n    return null;\n}\n\nlet key = json.lockState;\n\nmsg.payload = {\n    [key]: 1\n};\n\nmsg.measurement = json.deviceId;\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 620,
+        "y": 140,
+        "wires": [
+            [
+                "12df8c778318fea9",
+                "1c8997c774e0849a"
+            ]
+        ]
+    },
+    {
+        "id": "12df8c778318fea9",
+        "type": "debug",
+        "z": "b9e33d6c9e5b177b",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 800,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "1c8997c774e0849a",
+        "type": "influxdb out",
+        "z": "b9e33d6c9e5b177b",
+        "influxdb": "4be87b655011e442",
+        "name": "",
+        "measurement": "",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "iot",
+        "bucket": "espdb",
+        "x": 850,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "3c497e2aacfacc2f",
+        "type": "influxdb in",
+        "z": "b9e33d6c9e5b177b",
+        "influxdb": "4be87b655011e442",
+        "name": "",
+        "query": "from(bucket: \"espdb\")\n  |> range(start: -3h, stop: now())\n  |> filter(fn: (r) => r[\"_measurement\"] == \"B40827CA4B70\")\n  |> filter(fn: (r) => r[\"_field\"] == \"IDLE_KEEP_ALIVE\")\n  |> cumulativeSum()",
+        "rawOutput": false,
+        "precision": "",
+        "retentionPolicy": "",
+        "org": "iot",
+        "x": 550,
+        "y": 480,
+        "wires": [
+            [
+                "680f6ad0d5021f0a",
+                "87c439dc57cf9287",
+                "f0a0dccc1c95226a"
+            ]
+        ]
+    },
+    {
+        "id": "680f6ad0d5021f0a",
+        "type": "function",
+        "z": "b9e33d6c9e5b177b",
+        "name": "function 2",
+        "func": "msg.topic = \"HEART BEAT\"; \n\nmsg.payload = msg.payload.map(item => {\n    return {\n        x: new Date(item._time).getTime(),\n        y: Number(item._value)\n    };\n});\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 760,
+        "y": 480,
+        "wires": [
+            [
+                "87c439dc57cf9287",
+                "6fb6e6eb7e21de65"
+            ]
+        ]
+    },
+    {
+        "id": "87c439dc57cf9287",
+        "type": "debug",
+        "z": "b9e33d6c9e5b177b",
+        "name": "debug 3",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 800,
+        "y": 620,
+        "wires": []
+    },
+    {
+        "id": "196486bc84fd1bde",
+        "type": "inject",
+        "z": "b9e33d6c9e5b177b",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 360,
+        "y": 480,
+        "wires": [
+            [
+                "3c497e2aacfacc2f"
+            ]
+        ]
+    },
+    {
+        "id": "17c15b8f5520735f",
+        "type": "ui-button",
+        "z": "b9e33d6c9e5b177b",
+        "group": "50388101a75c4b22",
+        "name": "Update Chart",
+        "label": "Update Data",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "emulateClick": false,
+        "tooltip": "",
+        "color": "",
+        "bgcolor": "",
+        "className": "",
+        "icon": "",
+        "iconPosition": "left",
+        "payload": "",
+        "payloadType": "str",
+        "topic": "topic",
+        "topicType": "msg",
+        "buttonColor": "",
+        "textColor": "",
+        "iconColor": "",
+        "enableClick": true,
+        "enablePointerdown": false,
+        "pointerdownPayload": "",
+        "pointerdownPayloadType": "str",
+        "enablePointerup": false,
+        "pointerupPayload": "",
+        "pointerupPayloadType": "str",
+        "x": 370,
+        "y": 420,
+        "wires": [
+            [
+                "3c497e2aacfacc2f"
+            ]
+        ]
+    },
+    {
+        "id": "a25176f5a5a6e633",
+        "type": "ui-text",
+        "z": "b9e33d6c9e5b177b",
+        "group": "50388101a75c4b22",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "name": "",
+        "label": "Wizualizacja przychodzącego sygnały HEART_BEAT",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#717171",
+        "wrapText": false,
+        "className": "",
+        "value": "payload",
+        "valueType": "msg",
+        "x": 1060,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "6fb6e6eb7e21de65",
+        "type": "ui-chart",
+        "z": "b9e33d6c9e5b177b",
+        "group": "50388101a75c4b22",
+        "name": "",
+        "label": "Heat Beat chart",
+        "order": 4,
+        "chartType": "line",
+        "category": "topic",
+        "categoryType": "msg",
+        "xAxisLabel": "",
+        "xAxisProperty": "x",
+        "xAxisPropertyType": "property",
+        "xAxisType": "time",
+        "xAxisFormat": "",
+        "xAxisFormatType": "auto",
+        "xmin": "",
+        "xmax": "",
+        "yAxisLabel": "",
+        "yAxisProperty": "y",
+        "yAxisPropertyType": "property",
+        "ymin": "",
+        "ymax": "",
+        "bins": 10,
+        "action": "replace",
+        "stackSeries": false,
+        "pointShape": "circle",
+        "pointRadius": 4,
+        "showLegend": true,
+        "removeOlder": "14",
+        "removeOlderUnit": "3600",
+        "removeOlderPoints": "",
+        "colors": [
+            "#0095ff",
+            "#ff0000",
+            "#ff7f0e",
+            "#2ca02c",
+            "#a347e1",
+            "#d62728",
+            "#ff9896",
+            "#9467bd",
+            "#c5b0d5"
+        ],
+        "textColor": [
+            "#666666"
+        ],
+        "textColorDefault": true,
+        "gridColor": [
+            "#e5e5e5"
+        ],
+        "gridColorDefault": true,
+        "width": 6,
+        "height": 8,
+        "className": "",
+        "interpolation": "linear",
+        "x": 940,
+        "y": 480,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "56cb488557f74543",
+        "type": "ui-table",
+        "z": "b9e33d6c9e5b177b",
+        "group": "50388101a75c4b22",
+        "name": "",
+        "label": "",
+        "order": 3,
+        "width": 0,
+        "height": 0,
+        "maxrows": 0,
+        "passthru": false,
+        "autocols": true,
+        "showSearch": true,
+        "deselect": true,
+        "selectionType": "none",
+        "columns": [],
+        "mobileBreakpoint": "sm",
+        "mobileBreakpointType": "defaults",
+        "action": "replace",
+        "className": "",
+        "x": 910,
+        "y": 420,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "f0a0dccc1c95226a",
+        "type": "function",
+        "z": "b9e33d6c9e5b177b",
+        "name": "function 3",
+        "func": "let rawData = msg.payload;\n\nlet formattedData = rawData.map(row => {\n    let date = new Date(row._time);\n    let hours = String(date.getHours()).padStart(2, '0');\n    let minutes = String(date.getMinutes()).padStart(2, '0');\n    let seconds = String(date.getSeconds()).padStart(2, '0');\n    let timeString = hours + \":\" + minutes + \":\" + seconds;\n\n    return {\n        \"Czas\": timeString,\n        \"Ilość sygnałów heart beat\": row._value\n    };\n});\n\nmsg.payload = formattedData;\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 760,
+        "y": 420,
+        "wires": [
+            [
+                "56cb488557f74543"
+            ]
+        ]
+    },
+    {
+        "id": "a255b7bfdd68f979",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-contrib-influxdb": "0.7.0",
+            "@flowfuse/node-red-dashboard": "1.30.2"
+        }
+    }
+]
