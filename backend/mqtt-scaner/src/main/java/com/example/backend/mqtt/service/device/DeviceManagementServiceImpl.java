@@ -72,22 +72,22 @@ public class DeviceManagementServiceImpl implements DeviceManagementService {
     public boolean isDeviceAlive(String firebaseId, String deviceId) {
         Device device = verifyOwnership(firebaseId, deviceId);
 
-        return !device.isBlocked();
+        //return !device.isBlocked();
 
-//        if (influxTelemetryService.hasRecentActivity(deviceId, "-6m")) {
-//            return true;
-//        }
+        if (influxTelemetryService.hasRecentActivity(deviceId, "-6m")) {
+            return true;
+        }
 
-//        CompletableFuture<Boolean> pingFuture = devicePingManager.registerPing(deviceId);
-//        try {
-//            LockCommandResponse pingCommand = new LockCommandResponse(Instant.now(), "CHECK_ALIVE");
-//            deviceCommandMqttPublisher.sendCommand(deviceId, pingCommand);
-//            return pingFuture.get(10, TimeUnit.SECONDS);
-//        } catch (Exception e) {
-//            return false;
-//        } finally {
-//            devicePingManager.removePing(deviceId);
-//        }
+        CompletableFuture<Boolean> pingFuture = devicePingManager.registerPing(deviceId);
+        try {
+            LockCommandResponse pingCommand = new LockCommandResponse(Instant.now(), "CHECK_ALIVE");
+            deviceCommandMqttPublisher.sendCommand(deviceId, pingCommand);
+            return pingFuture.get(10, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            return false;
+        } finally {
+            devicePingManager.removePing(deviceId);
+        }
     }
 
     @Override
