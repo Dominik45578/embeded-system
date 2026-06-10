@@ -39,8 +39,9 @@ services:
       DOCKER_INFLUXDB_INIT_MODE: setup
       DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_INIT_USERNAME}
       DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_INIT_PASSWORD}
-      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_INIT_ORG}
-      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_INIT_BUCKET}
+      DOCKER_INFLUXDB_INIT_ORG: ${BACKEND_INFLUX_ORG}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${BACKEND_INFLUX_BUCKET}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${BACKEND_INFLUX_TOKEN}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
       interval: 10s
@@ -149,6 +150,25 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    networks:
+      - app_network
+
+  node-red:
+    env_file:
+      - .env.app
+    image: kowalolo/nodered:1.0.0
+    container_name: iot_nodered
+    ports:
+      - "1880:1880"
+    environment:
+      - FLOWS=NodeRedMqttInflux.json
+      - TZ=Europe/Warsaw
+    restart: unless-stopped
+    depends_on:
+      mqtt-broker:
+        condition: service_started
+      influxdb:
+        condition: service_healthy
     networks:
       - app_network
 

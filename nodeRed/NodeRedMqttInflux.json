@@ -42,7 +42,7 @@
     {
         "id": "4be87b655011e442",
         "type": "influxdb",
-        "hostname": "127.0.0.1",
+        "hostname": "influxdb",
         "port": 8086,
         "protocol": "http",
         "database": "database",
@@ -50,7 +50,7 @@
         "usetls": false,
         "tls": "",
         "influxdbVersion": "2.0",
-        "url": "http://localhost:8181",
+        "url": "http://influxdb:8086",
         "timeout": 10,
         "rejectUnauthorized": true
     },

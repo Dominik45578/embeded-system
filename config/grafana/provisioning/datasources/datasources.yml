@@ -1,0 +1,41 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      maxLines: 1000
+
+  - name: PostgreSQL
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    user: admin
+    secureJsonData:
+      password: admin
+    jsonData:
+      database: iot
+      sslmode: disable
+      postgresVersion: 1600 # Postgres 16
+
+  - name: InfluxDB
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: lockly
+      defaultBucket: iot
+    secureJsonData:
+      token: Ojdp9UGN9O4092hnJsXcvnYarEh2COW_Ntg9UWHZb6aO7nRjT9cuP1Fs_k346xBSZOb92TEToIRe0l5-xoWSEQ==

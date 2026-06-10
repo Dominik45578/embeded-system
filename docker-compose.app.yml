@@ -4,8 +4,6 @@ services:
   mqtt-broker:
     env_file:
       - .env.app
-    profiles:
-      - app
     image: eclipse-mosquitto:${MOSQUITTO_VERSION}
     container_name: iot_mqtt_broker
     ports:
@@ -27,8 +25,6 @@ services:
   influxdb:
     env_file:
       - .env.app
-    profiles:
-      - app
     container_name: iot_influxdb
     image: influxdb:2.7
     ports:
@@ -43,8 +39,9 @@ services:
       DOCKER_INFLUXDB_INIT_MODE: setup
       DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_INIT_USERNAME}
       DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_INIT_PASSWORD}
-      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_INIT_ORG}
-      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_INIT_BUCKET}
+      DOCKER_INFLUXDB_INIT_ORG: ${BACKEND_INFLUX_ORG}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${BACKEND_INFLUX_BUCKET}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${BACKEND_INFLUX_TOKEN}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
       interval: 10s
@@ -55,8 +52,6 @@ services:
   mqtt-scaner:
     env_file:
       - .env.app
-    profiles:
-      - app
     image: kowalolo/mqtt-scaner:1.0
     build:
       context: ./backend/mqtt-scaner
@@ -91,8 +86,6 @@ services:
   firebase-integration:
     env_file:
       - .env.app
-    profiles:
-      - app
     ports:
       - "12100:12100"
     image: kowalolo/firebase-integration:1.0
@@ -123,8 +116,6 @@ services:
   postgres:
     env_file:
       - .env.app
-    profiles:
-      - app
     image: postgres:16-alpine
     container_name: iot_postgres
     restart: unless-stopped
@@ -163,6 +154,29 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    networks:
+      - app_network
+
+  node-red:
+    env_file:
+      - .env.app
+    build:
+      context: ./nodeRed
+      dockerfile: Dockerfile
+    container_name: iot_nodered
+    ports:
+      - "1880:1880"
+    volumes:
+      - ./nodeRed:/data
+    environment:
+      - FLOWS=NodeRedMqttInflux.json
+      - TZ=Europe/Warsaw
+    restart: unless-stopped
+    depends_on:
+      mqtt-broker:
+        condition: service_started
+      influxdb:
+        condition: service_healthy
     networks:
       - app_network
 

@@ -50,7 +50,7 @@ public class DeviceLogProcessingServiceImpl implements DeviceLogProcessingServic
         log.info("Saving log request to InfluxDB");
         Point point = Point.measurement("lock_logs")
                 .addTag("deviceId", request.deviceId())
-                .addField("lockState", request.lockState().ordinal())
+                .addField("lockState", request.lockState().toString())
                 .addField("message", request.message())
                 .addField("source", request.source())
                 .time(request.timestamp(), WritePrecision.MS);
